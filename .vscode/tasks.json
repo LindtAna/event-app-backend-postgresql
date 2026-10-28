@@ -1,0 +1,28 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run Backend",
+      "type": "shell",
+      "command": "go run ./cmd/api",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true
+    },
+    {
+      "label": "Run Frontend",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}/../EventAppClient/client"
+      },
+      "isBackground": true
+    },
+    {
+      "label": "Start Dev Environment",
+      "dependsOn": ["Run Backend", "Run Frontend"],
+      "problemMatcher": []
+    }
+  ]
+}

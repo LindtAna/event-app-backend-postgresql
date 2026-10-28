@@ -1,0 +1,454 @@
+definitions:
+  database.Attendee:
+    properties:
+      eventId:
+        type: integer
+      id:
+        type: integer
+      userId:
+        type: integer
+    type: object
+  database.Category:
+    properties:
+      id:
+        type: string
+      isDefault:
+        type: boolean
+      name:
+        type: string
+    type: object
+  database.Event:
+    properties:
+      categoryId:
+        type: string
+      categoryName:
+        type: string
+      description:
+        maxLength: 400
+        minLength: 3
+        type: string
+      endDateTime:
+        type: string
+      id:
+        type: integer
+      imageUrl:
+        type: string
+      location:
+        maxLength: 200
+        minLength: 3
+        type: string
+      owner:
+        $ref: '#/definitions/database.Owner'
+      ownerId:
+        type: integer
+      startDateTime:
+        type: string
+      title:
+        maxLength: 100
+        minLength: 3
+        type: string
+      url:
+        type: string
+    required:
+    - description
+    - endDateTime
+    - location
+    - startDateTime
+    - title
+    type: object
+  database.Owner:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+  database.User:
+    properties:
+      avatarUrl:
+        type: string
+      bio:
+        type: string
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      role:
+        type: string
+      status:
+        type: string
+      tenantId:
+        type: integer
+    type: object
+  main.authResponse:
+    properties:
+      accessToken:
+        type: string
+      user:
+        $ref: '#/definitions/database.User'
+    type: object
+  main.loginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 8
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  main.registerRequest:
+    properties:
+      avatarUrl:
+        type: string
+      bio:
+        type: string
+      companyName:
+        type: string
+      email:
+        type: string
+      invitationCode:
+        type: string
+      name:
+        minLength: 1
+        type: string
+      password:
+        minLength: 8
+        type: string
+      registrationType:
+        enum:
+        - owner
+        - member
+        type: string
+    required:
+    - email
+    - name
+    - password
+    - registrationType
+    type: object
+  main.updateProfileRequest:
+    properties:
+      avatarUrl:
+        type: string
+      bio:
+        type: string
+      name:
+        minLength: 2
+        type: string
+    required:
+    - name
+    type: object
+info:
+  contact: {}
+  description: Tenant-scoped event management API built with Go and Gin.
+  title: EventApp Backend API
+  version: "1.0"
+paths:
+  /api/v1/attendees/{id}/events:
+    get:
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/database.Event'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Lists events for a user in the authenticated tenant
+      tags:
+      - attendees
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Login-Daten
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/main.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.authResponse'
+      summary: Meldet einen Benutzer an
+      tags:
+      - auth
+  /api/v1/auth/logout:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Meldet den Benutzer ab
+      tags:
+      - auth
+  /api/v1/auth/refresh:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.authResponse'
+      summary: Erneuert den Access-Token
+      tags:
+      - auth
+  /api/v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Registrierungsdaten
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/main.registerRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/database.User'
+      summary: Registriert einen Owner oder ein eingeladenes Mitglied
+      tags:
+      - auth
+  /api/v1/categories:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/database.Category'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Listet Kategorien des authentifizierten Tenants auf
+      tags:
+      - categories
+  /api/v1/events:
+    get:
+      parameters:
+      - description: Filter by event owner within the tenant
+        in: query
+        name: ownerId
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/database.Event'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Returns events belonging to the authenticated tenant
+      tags:
+      - events
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Event
+        in: body
+        name: event
+        required: true
+        schema:
+          $ref: '#/definitions/database.Event'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/database.Event'
+      security:
+      - BearerAuth: []
+      summary: Creates an event in the authenticated tenant
+      tags:
+      - events
+  /api/v1/events/{id}:
+    delete:
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Deletes an event created by the authenticated user
+      tags:
+      - events
+    get:
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/database.Event'
+      security:
+      - BearerAuth: []
+      summary: Returns an event belonging to the authenticated tenant
+      tags:
+      - events
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated event
+        in: body
+        name: event
+        required: true
+        schema:
+          $ref: '#/definitions/database.Event'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/database.Event'
+      security:
+      - BearerAuth: []
+      summary: Updates an event created by the authenticated user
+      tags:
+      - events
+  /api/v1/events/{id}/attendees:
+    get:
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/database.User'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Lists attendees for an event in the authenticated tenant
+      tags:
+      - attendees
+  /api/v1/events/{id}/attendees/{userId}:
+    delete:
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Removes an attendee from an event
+      tags:
+      - attendees
+    post:
+      parameters:
+      - description: Event ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        type: integer
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/database.Attendee'
+      security:
+      - BearerAuth: []
+      summary: Adds a user from the same tenant to an event
+      tags:
+      - attendees
+  /api/v1/users/profile:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Profildaten
+        in: body
+        name: profile
+        required: true
+        schema:
+          $ref: '#/definitions/main.updateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Aktualisiert das Profil des angemeldeten Benutzers
+      tags:
+      - users
+securityDefinitions:
+  BearerAuth:
+    description: Enter your bearer token in the format **Bearer &lt;token&gt;**
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
