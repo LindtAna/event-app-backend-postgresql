@@ -39,18 +39,6 @@ Ein kompatibles Frontend auf Basis von React und TypeScript befindet sich in ein
 
 Frontend und Backend kommunizieren über eine REST-API mit dem Präfix `/api/v1`. Beide Anwendungen können unabhängig voneinander gestartet werden. Für den lokalen gemeinsamen Betrieb müssen die API-Basis-URL des Frontends und `CLIENT_ORIGIN` im Backend zueinander passen.
 
-
-### Architekturentscheidung 
-Diese Implementierung stellt eine eigenständig ausführbare Backend-Anwendung mit mandantenbezogener Datenisolierung und relationaler Datenhaltung bereit.
-
-
-### Zugehöriges Frontend und lokaler Betrieb
-Für dieses Backend steht ein kompatibles Frontend auf Basis von React und TypeScript zur Verfügung:
-[EventApp Frontend auf GitHub](https://github.com/LindtAna/event-app-frontend)
-
-Beide Komponenten sind aufeinander abgestimmt und können gemeinsam lokal betrieben werden, sodass eine vollständige Event-Management-Anwendung entsteht.
-Das Frontend kommuniziert über eine REST-API mit dem Backend. Bei entsprechender Konfiguration der API-Basis-URL und der erforderlichen CORS-Einstellungen können beide Komponenten unabhängig voneinander gestartet werden.
-
 ---
 
 ## Features
@@ -157,8 +145,9 @@ Bei Verwendung von Neon sind zwei unterschiedliche Verbindungstypen vorgesehen:
 - **`MIGRATIONS_DATABASE_URL`:** direkte, ungepoolte Verbindungs-URL (Direct / Unpooled Connection) für Schemaänderungen durch `golang-migrate`.
 
 Für beide Variablen werden die jeweils von Neon bereitgestellten Verbindungs-URLs verwendet. Bei einer Pooler-Verbindung enthält der Host üblicherweise den entsprechenden Pooler-Endpunkt; die Migrationsverbindung verwendet den direkten Endpunkt. Zugangsdaten mit reservierten URL-Zeichen müssen URL-kodiert sein.
-
 Die API liest ausschließlich `DATABASE_URL`. Das separate Migrationstool liest ausschließlich `MIGRATIONS_DATABASE_URL`.
+
+
 ---
 
 ## Datenbankmigrationen
@@ -195,8 +184,6 @@ go run ./cmd/migrate down
 Die Migrationen definieren unter anderem Identity-Spalten für automatisch generierte IDs, Constraints, zusammengesetzte Fremdschlüssel und Indizes. Die Tabellen werden in der oben angegebenen Reihenfolge angelegt, damit die referenzierten Tabellen bereits vorhanden sind.
 
 ---
-
-## API-Dokumentation
 
 ## API-Dokumentation
 
