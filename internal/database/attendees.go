@@ -69,6 +69,7 @@ func (m *AttendeeModel) Insert(
 		INSERT INTO attendees (tenant_id, event_id, user_id)
 		VALUES ($1, $2, $3)
 		ON CONFLICT (tenant_id, event_id, user_id) DO NOTHING
+		RETURNING id
 	`,
 		tenantID,
 		attendee.EventId,

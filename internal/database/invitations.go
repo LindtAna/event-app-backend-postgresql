@@ -247,6 +247,7 @@ func (m *InvitationModel) RegisterMember(
 		  AND used_at IS NULL
 		  AND revoked_at IS NULL
 		  AND expires_at::timestamp > (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+		  FOR UPDATE
 	`, hashInvitationToken(rawToken)).Scan(
 		&invitationID,
 		&tenantID,

@@ -16,5 +16,3 @@ CREATE TABLE attendees (
 
 CREATE INDEX attendees_tenant_user_idx
     ON attendees (tenant_id, user_id, event_id);
-CREATE INDEX attendees_tenant_event_idx
-    ON attendees (tenant_id, event_id, user_id);
