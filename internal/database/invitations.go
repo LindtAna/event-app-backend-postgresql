@@ -75,41 +75,31 @@ func (m *InvitationModel) Create(
 	}
 	defer tx.Rollback()
 
-	result, err := tx.ExecContext(ctx, `
+	var invitationID int
+	var createdAt string
+
+	err = tx.QueryRowContext(ctx, `
 		INSERT INTO invitations (
 			tenant_id,
 			token_hash,
 			expires_at,
 			created_by
 		)
-		VALUES (?, ?, ?, ?)
-	`,
+		VALUES ($1, $2, $3, $4)
+	RETURNING id, created_at
+`,
 		tenantID,
 		tokenHash,
 		expiration,
 		createdBy,
-	)
-	if err != nil {
-		return nil, "", err
-	}
+	).Scan(&invitationID, &createdAt)
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return nil, "", err
-	}
-
-	var createdAt string
-	err = tx.QueryRowContext(ctx, `
-		SELECT created_at
-		FROM invitations
-		WHERE id = ? AND tenant_id = ?
-	`, id, tenantID).Scan(&createdAt)
 	if err != nil {
 		return nil, "", err
 	}
 
 	invitation := &Invitation{
-		ID:        int(id),
+		ID:        invitationID,
 		TenantID:  tenantID,
 		ExpiresAt: expiration,
 		CreatedBy: createdBy,
@@ -141,7 +131,7 @@ func (m *InvitationModel) ListByTenant(
 			created_by,
 			created_at
 		FROM invitations
-		WHERE tenant_id = ?
+		WHERE tenant_id = $1
 		ORDER BY created_at DESC
 	`, tenantID)
 	if err != nil {
@@ -196,12 +186,15 @@ func (m *InvitationModel) Revoke(
 
 	result, err := m.DB.ExecContext(ctx, `
 		UPDATE invitations
-		SET revoked_at = CURRENT_TIMESTAMP
-		WHERE tenant_id = ?
-		  AND id = ?
-		  AND used_at IS NULL
-		  AND revoked_at IS NULL
-		  AND datetime(expires_at) > datetime('now')
+		SET revoked_at = TO_CHAR(
+		CURRENT_TIMESTAMP AT TIME ZONE 'UTC',
+		'YYYY-MM-DD HH24:MI:SS'
+	)
+	    WHERE tenant_id = $1
+		AND id = $2
+		AND used_at IS NULL
+		AND revoked_at IS NULL
+		AND expires_at::timestamp > (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
 	`, tenantID, invitationID)
 	if err != nil {
 		return err
@@ -250,10 +243,10 @@ func (m *InvitationModel) RegisterMember(
 	err = tx.QueryRowContext(ctx, `
 		SELECT id, tenant_id
 		FROM invitations
-		WHERE token_hash = ?
+		WHERE token_hash = $1
 		  AND used_at IS NULL
 		  AND revoked_at IS NULL
-		  AND datetime(expires_at) > datetime('now')
+		  AND expires_at::timestamp > (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
 	`, hashInvitationToken(rawToken)).Scan(
 		&invitationID,
 		&tenantID,
@@ -270,7 +263,7 @@ func (m *InvitationModel) RegisterMember(
 	err = tx.QueryRowContext(ctx, `
 		SELECT status
 		FROM tenants
-		WHERE id = ?
+		WHERE id = $1
 	`, tenantID).Scan(&tenantStatus)
 
 	if errors.Is(err, sql.ErrNoRows) {
@@ -298,11 +291,14 @@ func (m *InvitationModel) RegisterMember(
 	// Die Einladung als verwendet markieren
 	result, err := tx.ExecContext(ctx, `
 		UPDATE invitations
-		SET used_at = CURRENT_TIMESTAMP
-		WHERE id = ?
-		  AND used_at IS NULL
-		  AND revoked_at IS NULL
-		  AND datetime(expires_at) > datetime('now')
+		SET used_at = TO_CHAR(
+		CURRENT_TIMESTAMP AT TIME ZONE 'UTC',
+		'YYYY-MM-DD HH24:MI:SS'
+	)
+	    WHERE id = $1
+		AND used_at IS NULL
+		AND revoked_at IS NULL
+		AND expires_at::timestamp > (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
 	`, invitationID)
 	if err != nil {
 		return err
@@ -334,7 +330,7 @@ func (m *InvitationModel) Delete(
 ) error {
 	result, err := m.DB.ExecContext(
 		ctx,
-		`DELETE FROM invitations WHERE tenant_id = ? AND id = ?`,
+		`DELETE FROM invitations WHERE tenant_id = $1 AND id = $2`,
 		tenantID,
 		invitationID,
 	)
