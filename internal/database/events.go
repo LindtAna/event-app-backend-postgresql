@@ -117,12 +117,12 @@ func (m *EventModel) queryEvents(
 	defer cancel()
 
 	query := eventSelect + `
-		WHERE e.tenant_id = ?
+		WHERE e.tenant_id = $1
 	`
 	args := []any{tenantID}
 
 	if ownerID != nil {
-		query += ` AND e.owner_id = ?`
+		query += ` AND e.owner_id = $2`
 		args = append(args, *ownerID)
 	}
 
@@ -165,7 +165,7 @@ func (m *EventModel) Get(
 	defer cancel()
 
 	query := eventSelect + `
-		WHERE e.tenant_id = ? AND e.id = ?
+		WHERE e.tenant_id = $1 AND e.id = $2
 	`
 
 	event, err := scanEvent(
