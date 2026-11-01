@@ -56,13 +56,14 @@ func insertUserTx(ctx context.Context, tx *sql.Tx, user *User) error {
 		user.Status = "active"
 	}
 
-	result, err := tx.ExecContext(ctx, `
-		INSERT INTO users (
-			tenant_id, email, name, password_hash,
-			bio, avatar_url, role, status
-		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`,
+	err := tx.QueryRowContext(ctx, `
+	INSERT INTO users (
+		tenant_id, email, name, password_hash,
+		bio, avatar_url, role, status
+	)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	RETURNING id, created_at
+`,
 		user.TenantID,
 		normalizeEmail(user.Email),
 		strings.TrimSpace(user.Name),
@@ -71,26 +72,13 @@ func insertUserTx(ctx context.Context, tx *sql.Tx, user *User) error {
 		user.AvatarUrl,
 		user.Role,
 		user.Status,
-	)
+	).Scan(&user.Id, &user.CreatedAt)
+
 	if err != nil {
 		return err
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return err
-	}
-
-	user.Id = int(id)
 	user.Email = normalizeEmail(user.Email)
-
-	if err := tx.QueryRowContext(ctx, `
-    SELECT created_at
-    FROM users
-    WHERE id = ?
-`, user.Id).Scan(&user.CreatedAt); err != nil {
-		return err
-	}
 
 	return nil
 }
@@ -151,7 +139,7 @@ func (m *UserModel) Get(
 		return nil, ErrInvalidUser
 	}
 
-	return m.getUser(ctx, userSelect+` WHERE id = ?`, id)
+	return m.getUser(ctx, userSelect+` WHERE id = $1`, id)
 }
 
 func (m *UserModel) GetByEmail(ctx context.Context,
@@ -163,7 +151,7 @@ func (m *UserModel) GetByEmail(ctx context.Context,
 
 	return m.getUser(
 		ctx,
-		userSelect+` WHERE email = ?`,
+		userSelect+` WHERE email = $1`,
 		email,
 	)
 }
@@ -177,7 +165,7 @@ func (m *UserModel) GetByIDInTenant(
 	}
 	return m.getUser(
 		ctx,
-		userSelect+` WHERE tenant_id = ? AND id = ?`,
+		userSelect+` WHERE tenant_id = $1 AND id = $2`,
 		tenantID,
 		userID,
 	)
@@ -197,10 +185,10 @@ func (m *UserModel) UpdateProfile(ctx context.Context,
 
 	result, err := m.DB.ExecContext(ctx, `
 		UPDATE users
-		SET name = ?, bio = ?, avatar_url = ?
-		WHERE tenant_id = ?
-          AND id = ?
-          AND status = 'active'
+	    SET name = $1, bio = $2, avatar_url = $3
+	    WHERE tenant_id = $4
+	    AND id = $5
+	    AND status = 'active'
 	`,
 		strings.TrimSpace(name),
 		bio,
