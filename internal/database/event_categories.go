@@ -31,12 +31,15 @@ func (m *EventModel) CreateWithCategory(ctx context.Context, tenantID int, event
 		return err
 	}
 
-	result, err := tx.ExecContext(ctx, `
+	var eventID int
+
+	err = tx.QueryRowContext(ctx, `
 		INSERT INTO events (
 			tenant_id, owner_id, title, description, image_url,
 			location, start_date_time, end_date_time, category_id, url
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	    RETURNING id
 	`,
 		tenantID,
 		event.OwnerId,
@@ -48,12 +51,8 @@ func (m *EventModel) CreateWithCategory(ctx context.Context, tenantID int, event
 		event.EndDateTime,
 		categoryID,
 		event.Url,
-	)
-	if err != nil {
-		return err
-	}
+	).Scan(&eventID)
 
-	id, err := result.LastInsertId()
 	if err != nil {
 		return err
 	}
@@ -62,7 +61,7 @@ func (m *EventModel) CreateWithCategory(ctx context.Context, tenantID int, event
 		return err
 	}
 
-	event.Id = int(id)
+	event.Id = eventID
 	event.CategoryId = categoryID
 	event.CategoryName = ""
 
@@ -92,7 +91,7 @@ func (m *EventModel) UpdateWithCategory(
 	err = tx.QueryRowContext(
 		ctx,
 		`SELECT category_id FROM events
-		WHERE tenant_id = ? AND id = ? AND owner_id = ?`,
+		WHERE tenant_id = $1 AND id = $2 AND owner_id = $3`,
 		tenantID,
 		event.Id,
 		ownerID,
@@ -108,15 +107,15 @@ func (m *EventModel) UpdateWithCategory(
 
 	result, err := tx.ExecContext(ctx, `
 		UPDATE events
-		SET title = ?,
-		    description = ?,
-		    image_url = ?,
-		    location = ?,
-		    start_date_time = ?,
-		    end_date_time = ?,
-		    category_id = ?,
-		    url = ?
-		WHERE tenant_id = ? AND id = ? AND owner_id = ?
+		SET title = $1,
+	    description = $2,
+	    image_url = $3,
+	    location = $4,
+	    start_date_time = $5,
+	    end_date_time = $6,
+	    category_id = $7,
+	    url = $8
+	    WHERE tenant_id = $9 AND id = $10 AND owner_id = $11
 	`,
 		event.Title,
 		event.Description,
@@ -185,7 +184,7 @@ func (m *EventModel) DeleteWithCategory(
 	err = tx.QueryRowContext(
 		ctx,
 		`SELECT category_id FROM events
-		WHERE tenant_id = ? AND id = ? AND owner_id = ?`,
+		WHERE tenant_id = $1 AND id = $2 AND owner_id = $3`,
 		tenantID,
 		eventID,
 		ownerID,
@@ -198,7 +197,7 @@ func (m *EventModel) DeleteWithCategory(
 	result, err := tx.ExecContext(
 		ctx,
 		`DELETE FROM events
-		WHERE tenant_id = ? AND id = ? AND owner_id = ?`,
+		WHERE tenant_id = $1 AND id = $2 AND owner_id = $3`,
 		tenantID,
 		eventID,
 		ownerID,
@@ -255,7 +254,7 @@ func resolveCategory(
 		err := tx.QueryRowContext(
 			ctx,
 			`SELECT id FROM categories
-			WHERE tenant_id = ? AND name_key = ?`,
+			WHERE tenant_id = $1 AND name_key = $2`,
 			tenantID,
 			nameKey,
 		).Scan(&existingID)
@@ -275,7 +274,8 @@ func resolveCategory(
 
 		_, err = tx.ExecContext(
 			ctx,
-			`INSERT INTO categories (tenant_id, id, name, name_key, is_default) VALUES (?, ?, ?, ?, 0)`,
+			`INSERT INTO categories (tenant_id, id, name, name_key, is_default)
+			VALUES ($1, $2, $3, $4, 0)`,
 			tenantID,
 			newID,
 			categoryName,
@@ -296,7 +296,7 @@ func resolveCategory(
 	err := tx.QueryRowContext(
 		ctx,
 		`SELECT id FROM categories
-		WHERE tenant_id = ? AND id = ?`,
+		WHERE tenant_id = $1 AND id = $2`,
 		tenantID,
 		categoryID,
 	).Scan(&existingID)
@@ -323,9 +323,9 @@ func deleteUnusedCustomCategory(
 	_, err := tx.ExecContext(
 		ctx,
 		`DELETE FROM categories
-		WHERE tenant_id = ? AND id = ? AND is_default = 0
-		AND NOT EXISTS ( SELECT 1 FROM events
-		WHERE tenant_id = ? AND category_id = ? )`,
+         WHERE tenant_id = $1 AND id = $2 AND is_default = 0
+         AND NOT EXISTS ( SELECT 1 FROM events
+         WHERE tenant_id = $3 AND category_id = $4 )`,
 		tenantID,
 		categoryID,
 		tenantID,
