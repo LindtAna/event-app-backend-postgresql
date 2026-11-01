@@ -37,19 +37,19 @@ func (m *AttendeeModel) Insert(
 	}
 	defer tx.Rollback()
 
-	var valid int
+	var valid bool
 
 	err = tx.QueryRowContext(ctx, `
 		SELECT
 			EXISTS (
 				SELECT 1 FROM events
-				WHERE tenant_id = ? AND id = ?
+				WHERE tenant_id = $1 AND id = $2
 			)
 			AND EXISTS (
 				SELECT 1 FROM users
-				WHERE tenant_id = ?
-				  AND id = ?
-				  AND status = 'active'
+				WHERE tenant_id = $3
+			    AND id = $4
+			    AND status = 'active'
 			)
 	`,
 		tenantID, attendee.EventId,
@@ -59,33 +59,26 @@ func (m *AttendeeModel) Insert(
 		return err
 	}
 
-	if valid != 1 {
+	if !valid {
 		return sql.ErrNoRows
 	}
 
-	result, err := tx.ExecContext(ctx, `
+	var attendeeID int
+
+	err = tx.QueryRowContext(ctx, `
 		INSERT INTO attendees (tenant_id, event_id, user_id)
-		VALUES (?, ?, ?)
+		VALUES ($1, $2, $3)
 		ON CONFLICT (tenant_id, event_id, user_id) DO NOTHING
 	`,
 		tenantID,
 		attendee.EventId,
 		attendee.UserId,
-	)
-	if err != nil {
-		return err
-	}
+	).Scan(&attendeeID)
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rowsAffected == 0 {
+	if errors.Is(err, sql.ErrNoRows) {
 		return ErrAttendeeAlreadyExists
 	}
 
-	id, err := result.LastInsertId()
 	if err != nil {
 		return err
 	}
@@ -94,7 +87,7 @@ func (m *AttendeeModel) Insert(
 		return err
 	}
 
-	attendee.Id = int(id)
+	attendee.Id = attendeeID
 	return nil
 }
 
@@ -114,9 +107,9 @@ func (m *AttendeeModel) GetByEventAndAttendee(
 	query := `
 		SELECT id, event_id, user_id
 		FROM attendees
-		WHERE tenant_id = ?
-		  AND event_id = ?
-		  AND user_id = ?
+		WHERE tenant_id = $1
+		AND event_id = $2
+		AND user_id = $3
 	`
 
 	var attendee Attendee
@@ -155,9 +148,9 @@ func (m *AttendeeModel) GetAttendeesByEvent(
 		JOIN users u
 			ON u.tenant_id = a.tenant_id
 			AND u.id = a.user_id
-		WHERE a.tenant_id = ?
-		  AND a.event_id = ?
-		ORDER BY u.name COLLATE NOCASE
+		WHERE a.tenant_id = $1
+		  AND a.event_id = $2
+		ORDER BY LOWER(u.name)
 	`
 
 	rows, err := m.DB.QueryContext(ctx, query, tenantID, eventID)
@@ -199,9 +192,9 @@ func (m *AttendeeModel) Delete(
 
 	result, err := m.DB.ExecContext(ctx, `
 		DELETE FROM attendees
-		WHERE tenant_id = ?
-		  AND user_id = ?
-		  AND event_id = ?
+		WHERE tenant_id = $1
+		  AND user_id = $2
+		  AND event_id = $3
 	`,
 		tenantID,
 		userID,
@@ -258,8 +251,8 @@ func (m *AttendeeModel) GetEventsByAttendee(
 		LEFT JOIN categories c
 		ON c.tenant_id = e.tenant_id
 		AND c.id = e.category_id	
-		WHERE a.tenant_id = ?
-		  AND a.user_id = ?
+		WHERE a.tenant_id = $1
+		  AND a.user_id = $2
 		ORDER BY e.start_date_time ASC
 	`
 
