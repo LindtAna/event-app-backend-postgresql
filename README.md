@@ -30,7 +30,6 @@
 ### Architekturentscheidung 
 Diese Implementierung stellt eine eigenständig ausführbare Backend-Anwendung mit mandantenbezogener Datenisolierung und relationaler Datenhaltung bereit.
 
-Sie ist als eigenständiges Backend-Projekt mit geringen Infrastrukturabhängigkeiten konzipiert. Die Wahl von SQLite ermöglicht den Betrieb ohne separaten Datenbankserver.
 
 ### Zugehöriges Frontend und lokaler Betrieb
 Für dieses Backend steht ein kompatibles Frontend auf Basis von React und TypeScript zur Verfügung:

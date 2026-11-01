@@ -11,9 +11,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
-	sqlite "modernc.org/sqlite"
-	sqlite3 "modernc.org/sqlite/lib"
 )
 
 const (
@@ -160,20 +159,9 @@ func (app *application) isActiveUserAndTenant(
 	return true, nil
 }
 
-// isSQLiteUniqueConstraintError erkennt UNIQUE- und PRIMARY-KEY-Verletzungen.
-func isSQLiteUniqueConstraintError(err error) bool {
-	var sqliteErr *sqlite.Error
-	if !errors.As(err, &sqliteErr) {
-		return false
-	}
-
-	switch sqliteErr.Code() {
-	case sqlite3.SQLITE_CONSTRAINT_UNIQUE,
-		sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY:
-		return true
-	default:
-		return false
-	}
+func isPostgresUniqueConstraintError(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 // speichert den Refresh-Token in einem HttpOnly-Cookie.
@@ -354,7 +342,7 @@ func (app *application) registerUser(c *gin.Context) {
 				"error": "Invalid user data",
 			})
 
-		case isSQLiteUniqueConstraintError(err):
+		case isPostgresUniqueConstraintError(err):
 			c.JSON(http.StatusConflict, gin.H{
 				"error": "Email address is already registered",
 			})
