@@ -7,8 +7,7 @@ import (
 	"strings"
 	"time"
 
-	sqlite "modernc.org/sqlite"
-	sqlite3 "modernc.org/sqlite/lib"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // Standardisierte Fehler für die Mandantenverwaltung.
@@ -88,21 +87,10 @@ func slugify(name string) string {
 	return strings.Trim(b.String(), "-")
 }
 
-// erkennt SQLite-Verletzungen von
-// UNIQUE- und PRIMARY KEY-Constraints, um diese in domänenspezifische Fehler zu übersetzen.
+// Erkennt PostgreSQL-Verletzungen von UNIQUE- und PRIMARY KEY-Constraints.
 func isTenantUniqueConstraintError(err error) bool {
-	var sqliteErr *sqlite.Error
-	if !errors.As(err, &sqliteErr) {
-		return false
-	}
-
-	switch sqliteErr.Code() {
-	case sqlite3.SQLITE_CONSTRAINT_UNIQUE,
-		sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY:
-		return true
-	default:
-		return false
-	}
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 // erstellt atomar einen Mandanten und dessen Owner
@@ -146,26 +134,19 @@ func (m *TenantModel) CreateWithOwner(
 	} // Automatischer Rollback, falls die Transaktion nicht erfolgreich committed wird
 	defer tx.Rollback()
 
-	// Mandanten in die Datenbank einfügen
-	// UNIQUE-Constraints greifen zuverlässig bei parallelen Aufrufen
-	_, err = tx.ExecContext(ctx, `
-		INSERT INTO tenants (name, name_key, slug, status)
-		VALUES (?, ?, ?, 'active')
-	`, cleanName, nameKey, slug)
+	// Mandanten einfügen und die generierte ID direkt zurückgeben.
+	var tenantID int
+
+	err = tx.QueryRowContext(ctx, `
+	INSERT INTO tenants (name, name_key, slug, status)
+	VALUES ($1, $2, $3, 'active')
+	RETURNING id
+`, cleanName, nameKey, slug).Scan(&tenantID)
+
 	if err != nil {
 		if isTenantUniqueConstraintError(err) {
 			return nil, ErrTenantNameTaken
 		}
-		return nil, err
-	}
-
-	var tenantID int
-	err = tx.QueryRowContext(ctx, `
-		SELECT id
-		FROM tenants
-		WHERE name_key = ?
-	`, nameKey).Scan(&tenantID)
-	if err != nil {
 		return nil, err
 	}
 
@@ -186,7 +167,7 @@ func (m *TenantModel) CreateWithOwner(
 	err = tx.QueryRowContext(ctx, `
 		SELECT id, name, name_key, slug, status, created_at
 		FROM tenants
-		WHERE id = ?
+		WHERE id = $1
 	`, tenantID).Scan(
 		&tenant.ID,
 		&tenant.Name,
@@ -218,7 +199,7 @@ func (m *TenantModel) Get(ctx context.Context, id int) (*Tenant, error) {
 	err := m.DB.QueryRowContext(ctx, `
 		SELECT id, name, name_key, slug, status, created_at
 		FROM tenants
-		WHERE id = ?
+		WHERE id = $1
 	`, id).Scan(
 		&tenant.ID,
 		&tenant.Name,
