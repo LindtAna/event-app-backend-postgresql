@@ -29,8 +29,8 @@ func (m CategoryModel) GetAll(
 	query := `
 		SELECT id, name, is_default
 		FROM categories
-		WHERE tenant_id = ?
-		ORDER BY is_default DESC, name COLLATE NOCASE ASC
+		WHERE tenant_id = $1
+		ORDER BY is_default DESC, LOWER(name) ASC
 	`
 	//Die Standard-Systemkategorien -> immer oben in der Liste,
 	// benutzerdefinierte Kategorien werden sortiert alphabetisch

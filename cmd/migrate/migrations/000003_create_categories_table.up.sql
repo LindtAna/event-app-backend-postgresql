@@ -12,4 +12,4 @@ CREATE TABLE categories (
 );
 
 CREATE INDEX categories_tenant_default_name_idx
-    ON categories (tenant_id, is_default DESC, name COLLATE NOCASE ASC);
+    ON categories (tenant_id, is_default DESC, LOWER(name) ASC);
