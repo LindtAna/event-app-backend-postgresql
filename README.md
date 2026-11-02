@@ -14,7 +14,7 @@
 - [Ausführen der Migrationen](#ausfuhren-der-migrationen)
 - [API-Dokumentation](#api-dokumentation)
   - [API-Endpunkte](#api-endpunkte)
-  - [Manuelle API-Tests und cURL-Anleitung](#manuelle-api-tests-und-curl-anleitung)
+  - [Health Check](#health-check)
 - [Datenbank-Schema](#datenbank-schema)
   - [Beziehungen und Löschverhalten](#beziehungen-und-loschverhalten)
 - [Architektur](#architektur)
@@ -52,6 +52,7 @@ Frontend und Backend kommunizieren über eine REST-API mit dem Präfix `/api/v1`
 - **Einladungsverwaltung:** Tenant-Owner können Einladungen erstellen, auflisten, widerrufen und dauerhaft löschen.
 - **Rollen- und Zugriffskontrolle:** Owner-only-Zugriff auf die Einladungsverwaltung; Event-Änderungen und -Löschungen sind dem jeweiligen Ersteller vorbehalten.
 - **API-Dokumentation:** Interaktive Swagger-UI auf Basis von Swagger / OpenAPI.
+- **Health Check:** Öffentlicher Readiness-Endpunkt zur Überprüfung der PostgreSQL-Erreichbarkeit, z. B. für Infrastruktur-Monitoring.
 - **CORS:** Origin-Allowlist mit Unterstützung für mehrere konfigurierte Frontend-Adressen und Credentials.
 
 ---
@@ -77,14 +78,15 @@ Frontend und Backend kommunizieren über eine REST-API mit dem Präfix `/api/v1`
 │  │   ├── routes.go        # Öffentliche und geschützte API-Routen
 │  │   ├── middleware.go    # JWT-Authentifizierung, Tenant-Prüfung und CORS
 │  │   ├── auth.go          # Registrierung (Owner/Member), Login, Tokens und Profil
-│  │   ├── events.go        # HTTP-Handler für Events
+│  │   ├── context.go       # Zugriff auf den authentifizierten Benutzer
 │  │   ├── invitations.go   # Owner-only-Handler für Einladungen
 │  │   ├── categories.go    # HTTP-Handler für Kategorien
 │  │   ├── attendees.go     # HTTP-Handler für Event-Teilnehmer
+│  │   ├── health.go        # Öffentlicher Readiness-Handler für PostgreSQL
 │  │   └── context.go       # Zugriff auf den authentifizierten Benutzer
 │  └── migrate    # SQL-Up-/Down-Migrationen
 │       ├── main.go         # Separater Einstieg für Datenbankmigrationen
-│       └── migrationsс     # SQL-Up- und Down-Migrationen
+│       └── migrations      # SQL-Up- und Down-Migrationen
 │           ├── 000001_create_tenants_table.down.sql
 │           ├── 000001_create_tenants_table.up.sql
 │           ├── 000002_create_users_table.down.sql
@@ -199,6 +201,23 @@ Geschützte Endpunkte erwarten den Access Token im Header:
 Authorization: Bearer <accessToken>
 ```
 
+#### Health Check
+
+Der öffentliche Readiness-Endpunkt dient zur Überwachung der Verfügbarkeit des Backends und seiner PostgreSQL-Datenbank. Er ist für Infrastruktur-Monitoring vorgesehen, beispielsweise für die Health Checks von Render.
+
+| Methode | Endpunkt | Authentifizierung | Beschreibung |
+|---|---|---|---|
+| `GET` | `/health/ready` | Öffentlich (keine Authentifizierung) | Prüft, ob die Datenbankverbindung initialisiert ist und PostgreSQL erreichbar ist. |
+
+Der Endpunkt prüft, ob eine initialisierte Datenbankverbindung vorhanden ist und ob eine Kommunikation mit PostgreSQL erfolgreich möglich ist. Die Datenbankprüfung verwendet ein Timeout von zwei Sekunden, damit der Health Check nicht unbegrenzt auf eine Antwort wartet.
+
+Antworten:
+- `200 OK` – Das Backend ist bereit, Requests zu verarbeiten, und die Datenbankverbindung ist verfügbar.
+- `503 Service Unavailable` – Die Datenbankverbindung ist nicht verfügbar oder die Readiness-Prüfung kann nicht erfolgreich abgeschlossen werden.
+
+Der Endpunkt benötigt keinen Access Token und liegt außerhalb des Präfixes `/api/v1`.
+
+
 #### Authentifizierung und Benutzerprofil
 | Methode | Endpunkt | Authentifizierung | Beschreibung |
 |---|---|---|---|
@@ -207,6 +226,7 @@ Authorization: Bearer <accessToken>
 | `POST` | `/api/v1/auth/refresh` | Refresh-Cookie | Neuen Access Token ausstellen |
 | `POST` | `/api/v1/auth/logout` | Öffentlich | Refresh-Cookie löschen |
 | `PUT` | `/api/v1/users/profile` | Bearer Access Token | Eigenes Profil aktualisieren |
+
 
 #### Registrierungsmodi:
 
@@ -536,9 +556,12 @@ Beim Erstellen oder Aktualisieren eines Events werden Event-Änderung und Katego
 Swagger UI: /swagger/*any (außerhalb des Präfixes /api/v1)
 ```
 
-Öffentliche Auth-Routen benötigen keinen Access Token. 
+Öffentliche Auth-Routen benötigen keinen Access Token.
 Der Refresh-Endpunkt benötigt ein gültiges `refreshToken`-Cookie.
 Die übrigen fachlichen API-Routen sind durch die Auth-Middleware geschützt; die Einladungsverwaltung hat zusätzlich eine Owner-Rollenprüfung.
+
+Zusätzlich ist `GET /health/ready` als öffentlicher Readiness-Endpunkt direkt auf der Gin-Engine registriert. Er liegt außerhalb von `/api/v1` und benötigt keine Authentifizierung.
+
 Swagger UI wird unter `/swagger/*any` bereitgestellt.
 
 ---
@@ -555,3 +578,6 @@ Swagger UI wird unter `/swagger/*any` bereitgestellt.
 - **Rollen und Event-Berechtigungen:** Nur Owner dürfen Einladungen verwalten. Events dürfen nur von ihrem jeweiligen Ersteller geändert oder gelöscht werden. Bei Teilnehmeroperationen gelten die beschriebenen Rechte des Event-Erstellers und des jeweiligen Benutzers.
 - **Einladungstoken:** Der Klartext-Code wird nur bei der Erstellung ausgegeben; gespeichert wird ausschließlich sein SHA-256-Hash. Die Registrierung und das Markieren einer Einladung als verwendet erfolgen atomar.
 - **CORS:** Nur konfigurierte `CLIENT_ORIGIN`-Werte werden als Origins zugelassen. Credentials werden für erlaubte Origins unterstützt. 
+
+---
+

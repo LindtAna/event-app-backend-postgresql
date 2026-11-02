@@ -13,7 +13,10 @@ func (app *application) routes() http.Handler {
 
 	g.Use(app.CORSMiddleware())
 
-	// Public routes: no access token required.
+	// Health Check
+	g.GET("/health/ready", app.healthReady)
+
+	// Öffentliche Routen: kein access token erforderlich
 	v1 := g.Group("/api/v1")
 	{
 		v1.POST("/auth/register", app.registerUser)
@@ -22,12 +25,12 @@ func (app *application) routes() http.Handler {
 		v1.POST("/auth/logout", app.logout)
 	}
 
-	// Protected routes: valid access token and active tenant required
+	// Geschützte Routen: gültiges access token  und tenant:active erforderlich
 	protected := v1.Group("/")
 	protected.Use(app.AuthMiddleware())
 
 	{
-		// Invitations (owner only)
+		// Einladungen(owner only)
 		ownerProtected := protected.Group("/")
 		ownerProtected.Use(app.OwnerOnlyMiddleware())
 
@@ -65,7 +68,7 @@ func (app *application) routes() http.Handler {
 		}
 		ginSwagger.WrapHandler(
 			swaggerFiles.Handler,
-			ginSwagger.URL("http://localhost:8080/swagger/doc.json"))(c)
+			ginSwagger.URL("/swagger/doc.json"))(c)
 	})
 
 	return g

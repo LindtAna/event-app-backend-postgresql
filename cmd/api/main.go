@@ -26,6 +26,7 @@ type application struct {
 	port         int
 	jwtSecret    string
 	clientOrigin string
+	db           *sql.DB
 	models       database.Models
 }
 
@@ -64,6 +65,7 @@ func main() {
 		port:         env.GetEnvInt("PORT", 8080),
 		jwtSecret:    jwtSecret,
 		clientOrigin: env.GetEnvString("CLIENT_ORIGIN", "http://localhost:5173"),
+		db:           db,
 		models:       models,
 	}
 
