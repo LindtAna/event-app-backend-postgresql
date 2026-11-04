@@ -3,3 +3,15 @@ go get github.com/jackc/pgx/v5
 
 загрузить пакет pgxpoolи -> нужен самому адаптеру stdlib для поддержки работы с пулом соединений
 go get github.com/jackc/pgx/v5/pgxpool@v5.12.0
+
+
+Neon - create child branch -> integration-tests
+
+Parent branch: production.
+Delete - never
+Data: Current data
+
+в .env 
+# Integration Tests — direct connection to the integration-tests branch
+TEST_DATABASE_URL=... (NOT Connection pooling)
+

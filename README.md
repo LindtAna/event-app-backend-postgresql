@@ -84,9 +84,14 @@ Frontend und Backend kommunizieren über eine REST-API mit dem Präfix `/api/v1`
 │  │   ├── attendees.go         # HTTP-Handler für Event-Teilnehmer
 │  │   ├── health.go            # Öffentlicher Readiness-Handler für PostgreSQL
 │  │   ├── context.go           # Zugriff auf den authentifizierten Benutzer
+│  │   │
 │  │   ├── auth_test.go         # Unit Tests für JWT und Refresh-Token-Cookies
 │  │   ├── invitations_test.go  # Unit Tests für die Einladungsvalidierung
-│  │   └── middleware_test.go   # Unit Tests für Middleware und ID-Prüfungen
+│  │   ├── middleware_test.go   # Unit Tests für Middleware und ID-Prüfungen
+│  │   │
+│  │   ├── integration_helpers_test.go   # Gemeinsame Testumgebung und Datenbankmigrationen
+│  │   └── integration_health_test.go    # Integration Test für den Health Check
+│  │ 
 │  └── migrate    # SQL-Up-/Down-Migrationen
 │       ├── main.go         # Separater Einstieg für Datenbankmigrationen
 │       └── migrations      # SQL-Up- und Down-Migrationen
@@ -586,37 +591,68 @@ Swagger UI wird unter `/swagger/*any` bereitgestellt.
 
 ## Tests
 
-Das Backend enthält automatisierte Unit Tests für zentrale Funktionen der Authentifizierung, Middleware und Request-Validierung. Die Tests befinden sich im Paket `cmd/api` und verwenden die Go-Testbibliothek `testing` sowie `net/http/httptest` und testbezogene Gin-Kontexte.
+Das Backend enthält automatisierte `Unit Tests` und eine separate Infrastruktur für `Integration Tests`. Beide Testarten verwenden die Go-Testbibliothek testing.
 
-### Tests ausführen
 
-Die Befehle werden aus dem Projektstammverzeichnis ausgeführt.
+### Unit Tests
 
-**Unit Tests des API-Pakets:**
+Unit Tests prüfen einzelne Funktionen, Handler und Middleware unabhängig von einer realen PostgreSQL-Datenbank. Für HTTP-bezogene Tests werden net/http/httptest und testbezogene Gin-Kontexte verwendet.
 
-```bash
+#### Unit Tests ausführen
+
+Unit Tests des API-Pakets:
+```
 go test ./cmd/api -v
 ```
 
-Die Option `-v` zeigt die einzelnen Testfälle und deren Ergebnis an. Ohne diese Option wird eine kompaktere Zusammenfassung ausgegeben:
-
-```bash
-go test ./cmd/api
+Unit Tests aller Go-Pakete:
 ```
-
-**Tests aller Go-Pakete:**
-
-```bash
 go test ./...
 ```
-
-### Testumfang
-
+Unit-Testumfang
 | Testdatei | Abgedeckte Bereiche |
 |---|---|
 | `cmd/api/auth_test.go` | Erzeugung und Prüfung von Access und Refresh Tokens; Ablehnung falscher Token-Typen, ungültiger Signaturen, abgelaufener Tokens und ungültiger User-IDs; Attribute und Löschung des Refresh-Token-Cookies unter HTTP- und HTTPS-Bedingungen |
 | `cmd/api/invitations_test.go` | Validierung beim Erstellen einer Einladung: fehlender Authentifizierungskontext, ungültiges JSON, fehlendes oder ungültiges Ablaufdatum sowie ein bereits abgelaufenes Ablaufdatum |
 | `cmd/api/middleware_test.go` | CORS-Origin-Allowlist, CORS-Header, Ablehnung nicht erlaubter Origins, OPTIONS-Preflight und Requests ohne Origin; Ablehnung ungültiger Authorization-Header und von Refresh Tokens als Access Tokens; Owner-Rollenprüfung; Validierung des User-/Tenant-Kontexts und positiver IDs |
 
-Die Tests verwenden tabellengesteuerte Testfälle (`t.Run`), um mehrere gültige und ungültige Eingaben mit denselben Prüfungen abzudecken. Für HTTP-bezogene Tests werden Requests und Response Recorder über `httptest` erzeugt. Dadurch können Handler und Middleware ohne gestarteten HTTP-Server geprüft werden.
+Die Unit Tests verwenden tabellengesteuerte Testfälle (t.Run), um mehrere gültige und ungültige Eingaben mit denselben Prüfungen abzudecken. HTTP-bezogene Tests verwenden Requests und Response Recorder über httptest, ohne einen separaten HTTP-Server zu starten.
+
+
+### Integration Tests
+
+Integration Tests prüfen das Zusammenspiel der HTTP-Routen, Handler, Datenbankmodelle und einer echten PostgreSQL-Datenbank.
+Dafür wird ein HTTP-Testserver mit httptest.NewServer gestartet. Die Datenbankverbindung erfolgt über eine separate Neon-Branch-Datenbank. Vor den Tests werden die vorhandenen Datenbankmigrationen automatisch angewendet.
+Integration Tests sind durch den Go-Build-Tag integration von den regulären Unit Tests getrennt.
+
+#### Testumgebung und Datenbank
+
+Für Integration Tests wird eine dedizierte PostgreSQL-Datenbank verwendet. Die Verbindungs-URL wird ausschließlich über die Umgebungsvariable TEST_DATABASE_URL bereitgestellt.
+
+PostgreSQL-Verbindung für Integration Tests:
+```
+TEST_DATABASE_URL=postgresql://USER:PASSWORD@DIRECT_HOST/DATABASE?sslmode=require
+```
+
+Bei lokaler Ausführung wird die Variable aus der .env-Datei im Projektstammverzeichnis geladen. Bereits gesetzte Umgebungsvariablen werden dabei nicht überschrieben.
+
+Die Testumgebung verwendet ausschließlich `TEST_DATABASE_URL`.
+Es gibt keinen Fallback auf `DATABASE_URL` oder `MIGRATIONS_DATABASE_URL`.
+
+Die Datenbankmigrationen werden vor dem Start der Integration Tests automatisch angewendet. Dafür wird eine separate Datenbankverbindung verwendet, damit die Verbindung der Anwendung unabhängig bleibt.
+
+Wichtig: Für Integration Tests muss eine dedizierte Testdatenbank verwendet werden. Die produktive Datenbank darf nicht als Testdatenbank konfiguriert werden.
+
+#### Integration Tests ausführen
+
+Integration Tests des API-Pakets:
+```
+go test -tags=integration ./cmd/api -v
+```
+Einen bestimmten Integration Test ausführen:
+```
+go test -tags=integration ./cmd/api -run TestIntegrationHealthReady -v
+```
+Der Build-Tag integration aktiviert ausschließlich die entsprechend gekennzeichneten Integration Tests. Ohne diesen Tag werden sie bei regulären Testläufen nicht berücksichtigt.
+
 
