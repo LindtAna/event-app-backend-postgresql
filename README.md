@@ -23,7 +23,7 @@
   - [Ablauf: Einladungen](#ablauf-einladungen)
   - [System-Architektur](#system-architektur)
 - [Sicherheit und Authentifizierung](#sicherheit-und-authentifizierung)
-- [Roadmap](#roadmap)
+- [Tests](#tests)
 
 ## Über das Projekt
 
@@ -73,17 +73,20 @@ Frontend und Backend kommunizieren über eine REST-API mit dem Präfix `/api/v1`
 .
 ├─ cmd
 │  ├── api
-│  │   ├── main.go          # Anwendungseinstieg und PostgreSQL-Verbindung
-│  │   ├── server.go        # HTTP-Server Konfiguration
-│  │   ├── routes.go        # Öffentliche und geschützte API-Routen
-│  │   ├── middleware.go    # JWT-Authentifizierung, Tenant-Prüfung und CORS
-│  │   ├── auth.go          # Registrierung (Owner/Member), Login, Tokens und Profil
-│  │   ├── context.go       # Zugriff auf den authentifizierten Benutzer
-│  │   ├── invitations.go   # Owner-only-Handler für Einladungen
-│  │   ├── categories.go    # HTTP-Handler für Kategorien
-│  │   ├── attendees.go     # HTTP-Handler für Event-Teilnehmer
-│  │   ├── health.go        # Öffentlicher Readiness-Handler für PostgreSQL
-│  │   └── context.go       # Zugriff auf den authentifizierten Benutzer
+│  │   ├── main.go              # Anwendungseinstieg und PostgreSQL-Verbindung
+│  │   ├── server.go            # HTTP-Server Konfiguration
+│  │   ├── routes.go            # Öffentliche und geschützte API-Routen
+│  │   ├── middleware.go        # JWT-Authentifizierung, Tenant-Prüfung und CORS
+│  │   ├── auth.go              # Registrierung (Owner/Member), Login, Tokens und Profil
+│  │   ├── context.go           # Zugriff auf den authentifizierten Benutzer
+│  │   ├── invitations.go       # Owner-only-Handler für Einladungen
+│  │   ├── categories.go        # HTTP-Handler für Kategorien
+│  │   ├── attendees.go         # HTTP-Handler für Event-Teilnehmer
+│  │   ├── health.go            # Öffentlicher Readiness-Handler für PostgreSQL
+│  │   ├── context.go           # Zugriff auf den authentifizierten Benutzer
+│  │   ├── auth_test.go         # Unit Tests für JWT und Refresh-Token-Cookies
+│  │   ├── invitations_test.go  # Unit Tests für die Einladungsvalidierung
+│  │   └── middleware_test.go   # Unit Tests für Middleware und ID-Prüfungen
 │  └── migrate    # SQL-Up-/Down-Migrationen
 │       ├── main.go         # Separater Einstieg für Datenbankmigrationen
 │       └── migrations      # SQL-Up- und Down-Migrationen
@@ -491,9 +494,9 @@ Beim Erstellen oder Aktualisieren eines Events werden Event-Änderung und Katego
 │                 │      │                          │  │   permanent          │       │
 │                 │      └─────────────┬────────────┘  └──────────┬───────────┘       │
 │                 │                    │                          │                   │
-│                 └────────────────────┴────┬─────────────────────┘                   │
-│                                           │                                         │
-│                                           ▼                                         │
+│                 └────────────────────┴───┬──────────────────────┘                   │
+│                                          │                                          │
+│                                          ▼                                          │
 │                            HTTP-Handler / Application Methods                       │
 │                                       (cmd/api)                                     │
 │                                          │                                          │
@@ -580,4 +583,40 @@ Swagger UI wird unter `/swagger/*any` bereitgestellt.
 - **CORS:** Nur konfigurierte `CLIENT_ORIGIN`-Werte werden als Origins zugelassen. Credentials werden für erlaubte Origins unterstützt. 
 
 ---
+
+## Tests
+
+Das Backend enthält automatisierte Unit Tests für zentrale Funktionen der Authentifizierung, Middleware und Request-Validierung. Die Tests befinden sich im Paket `cmd/api` und verwenden die Go-Testbibliothek `testing` sowie `net/http/httptest` und testbezogene Gin-Kontexte.
+
+### Tests ausführen
+
+Die Befehle werden aus dem Projektstammverzeichnis ausgeführt.
+
+**Unit Tests des API-Pakets:**
+
+```bash
+go test ./cmd/api -v
+```
+
+Die Option `-v` zeigt die einzelnen Testfälle und deren Ergebnis an. Ohne diese Option wird eine kompaktere Zusammenfassung ausgegeben:
+
+```bash
+go test ./cmd/api
+```
+
+**Tests aller Go-Pakete:**
+
+```bash
+go test ./...
+```
+
+### Testumfang
+
+| Testdatei | Abgedeckte Bereiche |
+|---|---|
+| `cmd/api/auth_test.go` | Erzeugung und Prüfung von Access und Refresh Tokens; Ablehnung falscher Token-Typen, ungültiger Signaturen, abgelaufener Tokens und ungültiger User-IDs; Attribute und Löschung des Refresh-Token-Cookies unter HTTP- und HTTPS-Bedingungen |
+| `cmd/api/invitations_test.go` | Validierung beim Erstellen einer Einladung: fehlender Authentifizierungskontext, ungültiges JSON, fehlendes oder ungültiges Ablaufdatum sowie ein bereits abgelaufenes Ablaufdatum |
+| `cmd/api/middleware_test.go` | CORS-Origin-Allowlist, CORS-Header, Ablehnung nicht erlaubter Origins, OPTIONS-Preflight und Requests ohne Origin; Ablehnung ungültiger Authorization-Header und von Refresh Tokens als Access Tokens; Owner-Rollenprüfung; Validierung des User-/Tenant-Kontexts und positiver IDs |
+
+Die Tests verwenden tabellengesteuerte Testfälle (`t.Run`), um mehrere gültige und ungültige Eingaben mit denselben Prüfungen abzudecken. Für HTTP-bezogene Tests werden Requests und Response Recorder über `httptest` erzeugt. Dadurch können Handler und Middleware ohne gestarteten HTTP-Server geprüft werden.
 
