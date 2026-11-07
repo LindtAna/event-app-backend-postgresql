@@ -86,7 +86,6 @@ func (app *application) generateToken(
 }
 
 // erstellt einen kurzlebigen Access-Token(15 Min)
-// generateAccessToken erstellt einen kurzlebigen Access-Token.
 func (app *application) generateAccessToken(userID int) (string, error) {
 	return app.generateToken(userID, accessTokenType, accessTokenTTL)
 }

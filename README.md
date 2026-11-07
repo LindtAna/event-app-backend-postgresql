@@ -90,7 +90,8 @@ Frontend und Backend kommunizieren über eine REST-API mit dem Präfix `/api/v1`
 │  │   ├── middleware_test.go   # Unit Tests für Middleware und ID-Prüfungen
 │  │   │
 │  │   ├── integration_helpers_test.go   # Gemeinsame Testumgebung und Datenbankmigrationen
-│  │   └── integration_health_test.go    # Integration Test für den Health Check
+│  │   ├── integration_health_test.go    # Integration Test für den Health Check
+│  │   └── integration_auth_test.go      # Integration Tests für Registrierung, Login, Token-Erneuerung und Logout
 │  │ 
 │  └── migrate    # SQL-Up-/Down-Migrationen
 │       ├── main.go         # Separater Einstieg für Datenbankmigrationen
@@ -655,4 +656,11 @@ go test -tags=integration ./cmd/api -run TestIntegrationHealthReady -v
 ```
 Der Build-Tag integration aktiviert ausschließlich die entsprechend gekennzeichneten Integration Tests. Ohne diesen Tag werden sie bei regulären Testläufen nicht berücksichtigt.
 
+#### Abdeckung der Integration Tests
 
+| Testdatei | Abgedeckte Bereiche |
+|---|---|
+| `cmd/api/integration_auth_test.go` | Owner-Registrierung einschließlich Tenant-Erstellung und Speicherung des Passwort-Hashes; Member-Registrierung mit gültigem Einladungscode und Markierung der Einladung als verwendet; Ablehnung doppelter E-Mail-Adressen mit `409 Conflict` sowie Prüfung, dass bei fehlgeschlagener Owner-Registrierung kein zusätzlicher Tenant bestehen bleibt; Login mit case-insensitiver E-Mail-Adresse sowie Ablehnung unbekannter Benutzer und falscher Passwörter; Prüfung der ausgestellten Access- und Refresh Tokens sowie der Refresh-Cookie-Attribute; Token-Erneuerung mit gültigem Refresh-Cookie und Ablehnung ohne Cookie; Logout und Prüfung des gelöschten Refresh-Cookies. |
+
+
+Die Authentifizierungs-Integrationstests senden HTTP-Requests an den gestarteten Testserver und prüfen zusätzlich relevante Datenbankzustände direkt in PostgreSQL. Dazu gehören unter anderem die Tenant- und Benutzerzuordnung, der gespeicherte bcrypt-Passworthash sowie der Verwendungsstatus einer Einladung.

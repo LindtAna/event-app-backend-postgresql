@@ -15,7 +15,7 @@ type createInvitationRequest struct {
 	ExpiresAt string `json:"expiresAt" binding:"required"`
 }
 
-// OwnerOnlyMiddleware erlaubt den Zugriff ausschließlich für Tenant-Owner
+// erlaubt den Zugriff ausschließlich für Tenant-Owner
 func (app *application) OwnerOnlyMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		roleValue, exists := c.Get("role")
@@ -41,7 +41,7 @@ func (app *application) OwnerOnlyMiddleware() gin.HandlerFunc {
 	}
 }
 
-// createInvitation erstellt eine Einladung für den authentifizierten Tenant.
+// erstellt eine Einladung für den authentifizierten Tenant.
 //
 // @Summary Erstellt eine Einladung
 // @Tags invitations
@@ -71,7 +71,7 @@ func (app *application) createInvitation(c *gin.Context) {
 		return
 	}
 
-	// Der Ablaufzeitpunkt muss ein gültiger RFC3339-Zeitstempel sein.
+	// Der Ablaufzeitpunkt muss ein gültiger RFC3339-Zeitstempel sein
 	expiresAt, err := time.Parse(
 		time.RFC3339,
 		strings.TrimSpace(req.ExpiresAt),
@@ -111,15 +111,15 @@ func (app *application) createInvitation(c *gin.Context) {
 		return
 	}
 
-	// Das rohe Token wird nur bei der Erstellung zurückgegeben.
-	// In der Datenbank wird ausschließlich der Hash gespeichert.
+	// Das rohe Token wird nur bei der Erstellung zurückgegeben
+	// In der DB wird ausschließlich der Hash gespeichert
 	c.JSON(http.StatusCreated, gin.H{
 		"invitation":     invitation,
 		"invitationCode": rawToken,
 	})
 }
 
-// getAllInvitations ruft alle Einladungen des eigenen Tenants ab.
+// ruft alle Einladungen des eigenen Tenants ab
 //
 // @Summary Listet Einladungen des eigenen Unternehmens
 // @Tags invitations
@@ -150,7 +150,7 @@ func (app *application) getAllInvitations(c *gin.Context) {
 		return
 	}
 
-	// Eine leere Liste als [] statt null zurückgeben.
+	// Eine leere Liste als [] statt null zurückgeben
 	if invitations == nil {
 		invitations = make([]*database.Invitation, 0)
 	}
@@ -158,7 +158,7 @@ func (app *application) getAllInvitations(c *gin.Context) {
 	c.JSON(http.StatusOK, invitations)
 }
 
-// revokeInvitation widerruft eine aktive Einladung des eigenen Tenants.
+// widerruft eine aktive Einladung des eigenen Tenants
 //
 // @Summary Widerruft eine Einladung
 // @Tags invitations
@@ -195,8 +195,8 @@ func (app *application) revokeInvitation(c *gin.Context) {
 	)
 	if err != nil {
 		if errors.Is(err, database.ErrInvalidInvitation) {
-			// Auch bei einer anderen Tenant-ID wird nicht offengelegt,
-			// ob eine fremde Einladung existiert.
+			// bei einer anderen Tenant-ID wird nicht offengelegt,
+			// ob eine fremde Einladung existiert
 			c.JSON(http.StatusNotFound, gin.H{
 				"error": "Invitation not found or no longer active",
 			})
@@ -213,7 +213,7 @@ func (app *application) revokeInvitation(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// deleteInvitation deletes an invitation permanently from the database.
+// deletes an invitation permanently from the DB
 //
 // @Summary Löscht eine Einladung dauerhaft
 // @Tags invitations
