@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"testing"
@@ -74,10 +75,13 @@ func integrationRequireStatus(
 	t.Helper()
 
 	if response.StatusCode != expectedStatus {
+		body, _ := io.ReadAll(response.Body)
+
 		t.Fatalf(
-			"Expected HTTP status %d, got %d",
+			"Expected HTTP status %d, got %d. Response body: %s",
 			expectedStatus,
 			response.StatusCode,
+			string(body),
 		)
 	}
 }

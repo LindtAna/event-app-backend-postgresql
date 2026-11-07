@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// newInvitationTestContext erstellt einen Test-Request für den Einladungs-Handler.
+// erstellt einen Test-Request für den Einladungs-Handler
 // Die Werte userId und tenantId simulieren den Kontext, den die Auth-Middleware
 // nach erfolgreicher Authentifizierung normalerweise bereitstellt
 func newInvitationTestContext(

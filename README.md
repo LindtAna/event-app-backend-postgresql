@@ -93,7 +93,8 @@ Frontend und Backend kommunizieren über eine REST-API mit dem Präfix `/api/v1`
 │  │   ├── integration_health_test.go    # Integration Test für den Health Check
 │  │   ├──  integration_auth_test.go      # Integration Tests für Registrierung, Login, Token-Erneuerung und Logout
 │  │   ├── integration_middleware_test.go  # Integration Tests für Auth-Middleware und aktuellen User-/Tenant-Status
-│  │   └── integration_profile_test.go    # Integration Tests für die Aktualisierung und Validierung des Benutzerprofils
+│  │   ├── integration_profile_test.go    # Integration Tests für die Aktualisierung und Validierung des Benutzerprofils
+│  │   └── integration_invitations_test.go  # Integration Tests für Einladungsverwaltung, Owner-Berechtigungen und Tenant-Isolierung
 │  │ 
 │  └── migrate    # SQL-Up-/Down-Migrationen
 │       ├── main.go         # Separater Einstieg für Datenbankmigrationen
@@ -667,6 +668,11 @@ Benutzerprofil:
 go test -tags=integration ./cmd/api -run TestIntegrationUpdateProfile -v
 ```
 
+Einladungsverwaltung:
+```
+go test -tags=integration ./cmd/api -run "TestIntegration.*Invitation" -v
+```
+
 #### Abdeckung der Integration Tests
 
 | Testdatei | Abgedeckte Bereiche |
@@ -674,10 +680,16 @@ go test -tags=integration ./cmd/api -run TestIntegrationUpdateProfile -v
 | `cmd/api/integration_auth_test.go` | Owner-Registrierung einschließlich Tenant-Erstellung und Speicherung des Passwort-Hashes; Member-Registrierung mit gültigem Einladungscode und Markierung der Einladung als verwendet; Ablehnung doppelter E-Mail-Adressen mit `409 Conflict` sowie Prüfung, dass bei fehlgeschlagener Owner-Registrierung kein zusätzlicher Tenant bestehen bleibt; Login mit case-insensitiver E-Mail-Adresse sowie Ablehnung unbekannter Benutzer und falscher Passwörter; Prüfung der ausgestellten Access- und Refresh Tokens sowie der Refresh-Cookie-Attribute; Token-Erneuerung mit gültigem Refresh-Cookie und Ablehnung ohne Cookie; Logout und Prüfung des gelöschten Refresh-Cookies. |
 | `cmd/api/integration_middleware_test.go` | Prüfung der Auth-Middleware mit einem gültigen Access Token und einer echten PostgreSQL-Datenbank; erneutes Laden der aktuellen Benutzerdaten aus der Datenbank einschließlich der Übernahme der aktuellen User-ID, Tenant-ID und Rolle in den Gin-Kontext; Ablehnung deaktivierter Benutzer (`disabled`), gesperrter Tenants (`suspended`) und gelöschter Benutzer mit zuvor ausgestellten Access Tokens (`401 Unauthorized`). |
 | `cmd/api/integration_profile_test.go` | Erfolgreiche Aktualisierung des eigenen Benutzerprofils mit Prüfung der HTTP-Antwort und der gespeicherten Daten in PostgreSQL; Prüfung der Bereinigung von Name und Avatar-URL; Ablehnung einer Manipulation geschützter Benutzerfelder wie User-ID, Tenant-ID, Rolle, Status und E-Mail-Adresse; Validierung ungültiger Profildaten einschließlich fehlendem Namen, zu kurzem Namen, Namen aus Leerzeichen und ungültigem JSON (`400 Bad Request`); Ablehnung nicht authentifizierter Profiländerungen (`401 Unauthorized`). |
+| `cmd/api/integration_invitations_test.go` | Erstellung von Einladungen einschließlich Prüfung der Tenant-Zuordnung und des Erstellers; Überprüfung der sicheren Speicherung des Einladungstokens anhand seines SHA-256-Hashes; Validierung ungültiger und fehlender Ablaufzeitpunkte; Abruf einer leeren Einladungsliste und Prüfung der Tenant-Isolierung; Ablehnung nicht authentifizierter Requests (`401 Unauthorized`) und unberechtigter Member-Requests (`403 Forbidden`); erfolgreicher Widerruf einer Einladung einschließlich Prüfung des gespeicherten Widerrufszeitpunkts; Ablehnung eines erneuten Widerrufs; dauerhafte Löschung von Einladungen sowie Ablehnung wiederholter Löschversuche; Prüfung der Tenant-Isolierung beim Widerruf und bei der dauerhaften Löschung (`404 Not Found`). |
 
 
-Die Authentifizierungs-Integrationstests senden HTTP-Requests an den gestarteten Testserver und prüfen zusätzlich relevante Datenbankzustände direkt in PostgreSQL. Dazu gehören unter anderem die Tenant- und Benutzerzuordnung, der gespeicherte bcrypt-Passworthash sowie der Verwendungsstatus einer Einladung.
+Die `Authentifizierungs-Integrationstests` senden HTTP-Requests an den gestarteten Testserver und prüfen zusätzlich relevante Datenbankzustände direkt in PostgreSQL. Dazu gehören unter anderem die Tenant- und Benutzerzuordnung, der gespeicherte bcrypt-Passworthash sowie der Verwendungsstatus einer Einladung.
 
-Die Integration Tests der Auth-Middleware prüfen die Aktualität des Benutzer- und Tenant-Status direkt anhand der PostgreSQL-Datenbank. Dazu werden Benutzer und Tenants nach der Ausstellung eines Access Tokens verändert. Die Tests stellen sicher, dass deaktivierte Benutzer, gesperrte Tenants und gelöschte Benutzer keinen Zugriff auf geschützte Endpunkte erhalten. Zusätzlich wird geprüft, dass die Middleware aktuelle Benutzerdaten aus der Datenbank in den Gin-Kontext übernimmt.
+Die `Integration Tests der Auth-Middleware` prüfen die Aktualität des Benutzer- und Tenant-Status direkt anhand der PostgreSQL-Datenbank. Dazu werden Benutzer und Tenants nach der Ausstellung eines Access Tokens verändert. Die Tests stellen sicher, dass deaktivierte Benutzer, gesperrte Tenants und gelöschte Benutzer keinen Zugriff auf geschützte Endpunkte erhalten. Zusätzlich wird geprüft, dass die Middleware aktuelle Benutzerdaten aus der Datenbank in den Gin-Kontext übernimmt.
 
-Die Integration Tests des Benutzerprofils verwenden den geschützten API-Endpunkt `PUT /api/v1/users/profile`. Neben der erfolgreichen Aktualisierung und der anschließenden Überprüfung der gespeicherten Daten werden auch ungültige Eingaben und fehlende Authentifizierung geprüft. Außerdem wird sichergestellt, dass vom Client übermittelte Änderungen an geschützten Benutzerfeldern wie Tenant-ID, Rolle und Status keine Auswirkungen auf die gespeicherten Kontodaten haben.
+Die `Integration Tests des Benutzerprofils` verwenden den geschützten API-Endpunkt `PUT /api/v1/users/profile`. Neben der erfolgreichen Aktualisierung und der anschließenden Überprüfung der gespeicherten Daten werden auch ungültige Eingaben und fehlende Authentifizierung geprüft. Außerdem wird sichergestellt, dass vom Client übermittelte Änderungen an geschützten Benutzerfeldern wie Tenant-ID, Rolle und Status keine Auswirkungen auf die gespeicherten Kontodaten haben.
+
+Die `Integrationstests der Einladungsverwaltung` prüfen die Owner-only-Berechtigungen und die Tenant-Isolierung anhand der tatsächlichen HTTP-Endpunkte. Dazu werden Einladungen über die API erstellt, aufgelistet, widerrufen und dauerhaft gelöscht. Die Tests überprüfen sowohl die zurückgegebenen HTTP-Statuscodes als auch die zugehörigen Datensätze direkt in PostgreSQL.
+Es wird geprüft, dass in der Datenbank ausschließlich der SHA-256-Hash und nicht der ursprüngliche Einladungscode gespeichert wird. Zusätzlich werden ungültige Ablaufzeitpunkte, fehlende Authentifizierung, unzureichende Benutzerrechte und Zugriffsversuche auf Einladungen anderer Tenants getestet.
+Nach Änderungen am Einladungsstatus wird der tatsächliche Datenbankzustand überprüft. Dadurch wird sichergestellt, dass abgewiesene Requests keine unerwünschten Änderungen oder Löschungen verursachen.
+
