@@ -674,6 +674,11 @@ Einladungsverwaltung:
 go test -tags=integration ./cmd/api -run "TestIntegration.*Invitation" -v
 ```
 
+Event-Verwaltung:
+```
+go test -tags=integration ./cmd/api -run "TestIntegration(CreateEvent|GetAllEvents|GetEvent|UpdateEvent|DeleteEvent)" -v
+```
+
 #### Abdeckung der Integration Tests
 
 | Testdatei | Abgedeckte Bereiche |
@@ -683,6 +688,7 @@ go test -tags=integration ./cmd/api -run "TestIntegration.*Invitation" -v
 | `cmd/api/integration_profile_test.go` | Erfolgreiche Aktualisierung des eigenen Benutzerprofils mit Prüfung der HTTP-Antwort und der gespeicherten Daten in PostgreSQL; Prüfung der Bereinigung von Name und Avatar-URL; Ablehnung einer Manipulation geschützter Benutzerfelder wie User-ID, Tenant-ID, Rolle, Status und E-Mail-Adresse; Validierung ungültiger Profildaten einschließlich fehlendem Namen, zu kurzem Namen, Namen aus Leerzeichen und ungültigem JSON (`400 Bad Request`); Ablehnung nicht authentifizierter Profiländerungen (`401 Unauthorized`). |
 | `cmd/api/integration_invitations_test.go` | Erstellung von Einladungen einschließlich Prüfung der Tenant-Zuordnung und des Erstellers; Überprüfung der sicheren Speicherung des Einladungstokens anhand seines SHA-256-Hashes; Validierung ungültiger und fehlender Ablaufzeitpunkte; Abruf einer leeren Einladungsliste und Prüfung der Tenant-Isolierung; Ablehnung nicht authentifizierter Requests (`401 Unauthorized`) und unberechtigter Member-Requests (`403 Forbidden`); erfolgreicher Widerruf einer Einladung einschließlich Prüfung des gespeicherten Widerrufszeitpunkts; Ablehnung eines erneuten Widerrufs; dauerhafte Löschung von Einladungen sowie Ablehnung wiederholter Löschversuche; Prüfung der Tenant-Isolierung beim Widerruf und bei der dauerhaften Löschung (`404 Not Found`). |
 | `cmd/api/integration_attendees_test.go` | Prüfung der Teilnehmerverwaltung über die HTTP-API: Hinzufügen und Entfernen von Teilnehmern; Berechtigungen des Event-Erstellers und des jeweiligen Teilnehmers; Ablehnung doppelter Teilnahmen und inaktiver Benutzer; Tenant-Isolierung für Events und Benutzer; Abruf und Sortierung der Teilnehmer- und Eventlisten; Behandlung leerer Ergebnisse und wiederholter Löschversuche; Überprüfung der Datenbankzustände nach Änderungen. |
+| `cmd/api/integration_events_test.go` | Integration Tests für die Event-Verwaltung über die HTTP-API: Erstellung von Events einschließlich Prüfung der serverseitigen Owner- und Tenant-Zuordnung; Abruf der Event-Liste mit Tenant-Isolierung und `ownerId`-Filter; Abruf einzelner Events; Aktualisierung und Löschung durch den jeweiligen Event-Ersteller; Ablehnung unberechtigter Änderungen und Löschungen innerhalb desselben Tenants (`403 Forbidden`); Ablehnung von Zugriffen auf Events anderer Tenants (`404 Not Found`); Überprüfung der gespeicherten Daten und der Datenbankzustände nach erfolgreichen und abgewiesenen Änderungen. |
 
 
 Die `Authentifizierungs-Integrationstests` senden HTTP-Requests an den gestarteten Testserver und prüfen zusätzlich relevante Datenbankzustände direkt in PostgreSQL. Dazu gehören unter anderem die Tenant- und Benutzerzuordnung, der gespeicherte bcrypt-Passworthash sowie der Verwendungsstatus einer Einladung.
@@ -708,3 +714,15 @@ Die Tests zum Abrufen der Events eines Benutzers prüfen die chronologische Sort
 Die Tests zum Entfernen von Teilnehmern prüfen die Berechtigung des Event-Erstellers und die Möglichkeit eines Teilnehmers, die eigene Teilnahme zu beenden. Unberechtigte Löschversuche werden mit `403 Forbidden` abgelehnt. Zusätzlich werden wiederholte Löschversuche und Zugriffe auf Events anderer Tenants überprüft.
 
 Nach erfolgreichen und abgewiesenen Änderungen wird der tatsächliche Datenbankzustand kontrolliert. Dadurch wird sichergestellt, dass berechtigte Requests die Teilnahme korrekt ändern und abgewiesene Requests keine unerwünschten Datenbankänderungen verursachen.
+
+
+
+Die `Integrationstests der Eventverwaltung` prüfen die fünf geschützten HTTP-Endpunkte für die Erstellung, Auflistung, den Abruf, die Aktualisierung und die Löschung von Events. Die Tests verwenden echte Access Tokens und führen die Requests über den gestarteten HTTP-Testserver gegen eine PostgreSQL-Datenbank aus.
+
+Für die Testdaten werden Owner, Member und ein weiterer Tenant über die vorhandenen Registrierungsabläufe angelegt. Benötigte Events und eine minimale technische Kategorie werden direkt in PostgreSQL vorbereitet. Die Kategorien selbst sind nicht Bestandteil dieser Tests. Die zu prüfenden Event-Operationen werden ausschließlich über die HTTP-API ausgeführt.
+
+Bei der Event-Erstellung wird geprüft, dass die Owner-ID unabhängig von einem möglicherweise manipulierten Clientwert aus dem authentifizierten Benutzerkontext übernommen wird. Beim Abruf der Event-Liste werden die Tenant-Isolierung sowie die Filterung anhand von `ownerId` und die Validierung ungültiger Filterwerte überprüft. Zusätzlich wird sichergestellt, dass Benutzer desselben Tenants Events unabhängig von deren Ersteller abrufen können.
+
+Die Aktualisierung und Löschung eines Events sind ausschließlich dem jeweiligen Ersteller vorbehalten. Die Tests prüfen erfolgreiche Änderungen durch den Event-Ersteller sowie die Ablehnung unberechtigter Änderungs- und Löschversuche durch andere Benutzer desselben Tenants mit `403 Forbidden`. Zugriffe auf Events anderer Tenants werden mit `404 Not Found` abgelehnt.
+
+Nach erfolgreichen und abgewiesenen Änderungen wird der tatsächliche Datenbankzustand kontrolliert. Dadurch wird sichergestellt, dass die Owner- und Tenant-Zuordnung korrekt bleibt, berechtigte Änderungen gespeichert werden und unberechtigte Requests keine unerwünschten Änderungen oder Löschungen verursachen.
