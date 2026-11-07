@@ -5,8 +5,10 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -184,4 +186,12 @@ func newIntegrationTestEnvironment(t *testing.T) *integrationTestEnvironment {
 		server: server,
 		db:     db,
 	}
+}
+
+// dekodiert den JSON-Body einer HTTP-Antwort
+func decodeIntegrationResponse(
+	response *http.Response,
+	target interface{},
+) error {
+	return json.NewDecoder(response.Body).Decode(target)
 }
