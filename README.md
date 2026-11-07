@@ -89,11 +89,12 @@ Frontend und Backend kommunizieren über eine REST-API mit dem Präfix `/api/v1`
 │  │   ├── invitations_test.go  # Unit Tests für die Einladungsvalidierung
 │  │   ├── middleware_test.go   # Unit Tests für Middleware und ID-Prüfungen
 │  │   │
-│  │   ├── integration_helpers_test.go   # Gemeinsame Testumgebung und Datenbankmigrationen
-│  │   ├── integration_health_test.go    # Integration Test für den Health Check
-│  │   ├──  integration_auth_test.go      # Integration Tests für Registrierung, Login, Token-Erneuerung und Logout
-│  │   ├── integration_middleware_test.go  # Integration Tests für Auth-Middleware und aktuellen User-/Tenant-Status
-│  │   ├── integration_profile_test.go    # Integration Tests für die Aktualisierung und Validierung des Benutzerprofils
+│  │   ├── integration_helpers_test.go      # Gemeinsame Testumgebung und Datenbankmigrationen
+│  │   ├── integration_health_test.go       # Integration Test für den Health Check
+│  │   ├──  integration_auth_test.go        # Integration Tests für Registrierung, Login, Token-Erneuerung und Logout
+│  │   ├── integration_middleware_test.go   # Integration Tests für Auth-Middleware und aktuellen User-/Tenant-Status
+│  │   ├── integration_profile_test.go      # Integration Tests für die Aktualisierung und Validierung des Benutzerprofils
+│  │   ├── integration_attendees_test.go    # Integration Tests für die Teilnehmerverwaltung, Berechtigungen und Tenant-Isolierung
 │  │   └── integration_invitations_test.go  # Integration Tests für Einladungsverwaltung, Owner-Berechtigungen und Tenant-Isolierung
 │  │ 
 │  └── migrate    # SQL-Up-/Down-Migrationen
@@ -681,6 +682,7 @@ go test -tags=integration ./cmd/api -run "TestIntegration.*Invitation" -v
 | `cmd/api/integration_middleware_test.go` | Prüfung der Auth-Middleware mit einem gültigen Access Token und einer echten PostgreSQL-Datenbank; erneutes Laden der aktuellen Benutzerdaten aus der Datenbank einschließlich der Übernahme der aktuellen User-ID, Tenant-ID und Rolle in den Gin-Kontext; Ablehnung deaktivierter Benutzer (`disabled`), gesperrter Tenants (`suspended`) und gelöschter Benutzer mit zuvor ausgestellten Access Tokens (`401 Unauthorized`). |
 | `cmd/api/integration_profile_test.go` | Erfolgreiche Aktualisierung des eigenen Benutzerprofils mit Prüfung der HTTP-Antwort und der gespeicherten Daten in PostgreSQL; Prüfung der Bereinigung von Name und Avatar-URL; Ablehnung einer Manipulation geschützter Benutzerfelder wie User-ID, Tenant-ID, Rolle, Status und E-Mail-Adresse; Validierung ungültiger Profildaten einschließlich fehlendem Namen, zu kurzem Namen, Namen aus Leerzeichen und ungültigem JSON (`400 Bad Request`); Ablehnung nicht authentifizierter Profiländerungen (`401 Unauthorized`). |
 | `cmd/api/integration_invitations_test.go` | Erstellung von Einladungen einschließlich Prüfung der Tenant-Zuordnung und des Erstellers; Überprüfung der sicheren Speicherung des Einladungstokens anhand seines SHA-256-Hashes; Validierung ungültiger und fehlender Ablaufzeitpunkte; Abruf einer leeren Einladungsliste und Prüfung der Tenant-Isolierung; Ablehnung nicht authentifizierter Requests (`401 Unauthorized`) und unberechtigter Member-Requests (`403 Forbidden`); erfolgreicher Widerruf einer Einladung einschließlich Prüfung des gespeicherten Widerrufszeitpunkts; Ablehnung eines erneuten Widerrufs; dauerhafte Löschung von Einladungen sowie Ablehnung wiederholter Löschversuche; Prüfung der Tenant-Isolierung beim Widerruf und bei der dauerhaften Löschung (`404 Not Found`). |
+| `cmd/api/integration_attendees_test.go` | Prüfung der Teilnehmerverwaltung über die HTTP-API: Hinzufügen und Entfernen von Teilnehmern; Berechtigungen des Event-Erstellers und des jeweiligen Teilnehmers; Ablehnung doppelter Teilnahmen und inaktiver Benutzer; Tenant-Isolierung für Events und Benutzer; Abruf und Sortierung der Teilnehmer- und Eventlisten; Behandlung leerer Ergebnisse und wiederholter Löschversuche; Überprüfung der Datenbankzustände nach Änderungen. |
 
 
 Die `Authentifizierungs-Integrationstests` senden HTTP-Requests an den gestarteten Testserver und prüfen zusätzlich relevante Datenbankzustände direkt in PostgreSQL. Dazu gehören unter anderem die Tenant- und Benutzerzuordnung, der gespeicherte bcrypt-Passworthash sowie der Verwendungsstatus einer Einladung.
@@ -693,3 +695,16 @@ Die `Integrationstests der Einladungsverwaltung` prüfen die Owner-only-Berechti
 Es wird geprüft, dass in der Datenbank ausschließlich der SHA-256-Hash und nicht der ursprüngliche Einladungscode gespeichert wird. Zusätzlich werden ungültige Ablaufzeitpunkte, fehlende Authentifizierung, unzureichende Benutzerrechte und Zugriffsversuche auf Einladungen anderer Tenants getestet.
 Nach Änderungen am Einladungsstatus wird der tatsächliche Datenbankzustand überprüft. Dadurch wird sichergestellt, dass abgewiesene Requests keine unerwünschten Änderungen oder Löschungen verursachen.
 
+Die `Integrationstests der Teilnehmerverwaltung` prüfen die vier geschützten HTTP-Endpunkte für die Verwaltung von Event-Teilnehmern. Die Requests werden an den gestarteten HTTP-Testserver gesendet und mit einer echten PostgreSQL-Datenbank ausgeführt.
+
+Für die Testdaten werden Owner und Member über die vorhandenen Registrierungs- und Authentifizierungsabläufe angelegt. Die benötigten Events werden direkt in PostgreSQL erstellt. Da die Event-Tabelle eine gültige Kategorie voraussetzt, wird pro Tenant eine minimale technische Kategorie angelegt. Die Kategorien selbst sind nicht Bestandteil dieser Tests. Bestehende Teilnahmen werden für einzelne Testszenarien direkt in der Datenbank vorbereitet; die tatsächlich zu prüfenden Änderungen erfolgen über die HTTP-API.
+
+Die Tests zum Hinzufügen von Teilnehmern prüfen die erfolgreiche Registrierung eines aktiven Benutzers innerhalb desselben Tenants, die selbstständige Anmeldung eines Benutzers sowie die Ablehnung doppelter Teilnahmen mit `409 Conflict`. Zusätzlich werden unberechtigte Registrierungsversuche, inaktive Benutzer und Zugriffe auf fremde Tenants geprüft.
+
+Die Tests zum Abrufen der Teilnehmer eines Events überprüfen die zurückgegebenen Benutzerinformationen einschließlich der Avatar-URL, die alphabetische Sortierung nach Namen sowie die Rückgabe einer leeren JSON-Liste. Der Zugriff auf Events eines anderen Tenants wird mit `404 Not Found` abgelehnt.
+
+Die Tests zum Abrufen der Events eines Benutzers prüfen die chronologische Sortierung anhand des Startzeitpunkts (`start_date_time`) sowie die Rückgabe einer leeren JSON-Liste. Benutzer anderer Tenants dürfen über diesen Endpunkt nicht abgerufen werden.
+
+Die Tests zum Entfernen von Teilnehmern prüfen die Berechtigung des Event-Erstellers und die Möglichkeit eines Teilnehmers, die eigene Teilnahme zu beenden. Unberechtigte Löschversuche werden mit `403 Forbidden` abgelehnt. Zusätzlich werden wiederholte Löschversuche und Zugriffe auf Events anderer Tenants überprüft.
+
+Nach erfolgreichen und abgewiesenen Änderungen wird der tatsächliche Datenbankzustand kontrolliert. Dadurch wird sichergestellt, dass berechtigte Requests die Teilnahme korrekt ändern und abgewiesene Requests keine unerwünschten Datenbankänderungen verursachen.
