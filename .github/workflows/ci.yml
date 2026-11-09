@@ -1,0 +1,59 @@
+
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Backend Tests and Build
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: eventapp_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d eventapp_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/eventapp_test?sslmode=disable
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Download Go dependencies
+        run: go mod download
+
+      - name: Run Unit Tests
+        run: go test -count=1 ./... -v
+
+      - name: Run Integration Tests
+        run: go test -count=1 -tags=integration ./cmd/api -run '^TestIntegration' -v
+
+      - name: Build Backend
+        run: go build ./...
