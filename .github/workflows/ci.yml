@@ -57,3 +57,35 @@ jobs:
 
       - name: Build Backend
         run: go build ./...
+        
+  production-migrations:
+    name: Apply Production Migrations
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    env:
+      MIGRATIONS_DATABASE_URL: ${{ secrets.PRODUCTION_MIGRATIONS_DATABASE_URL }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Download Go dependencies
+        run: go mod download
+
+      - name: Verify production database configuration
+        run: |
+          if [ -z "$MIGRATIONS_DATABASE_URL" ]; then
+            echo "::error::Production migration secret is missing."
+            exit 1
+          fi
+
+      - name: Apply production migrations
+        run: go run ./cmd/migrate up
