@@ -10,20 +10,25 @@
 - [Features](#features)
 - [Technologie-Stack](#technologie-stack)
 - [Repository-Struktur](#repository-struktur)
-- [Umgebungsvariablen & Lokaler Start](#umgebungsvariablen--lokaler-start)
-- [Ausführen der Migrationen](#ausfuhren-der-migrationen)
+- [Umgebungsvariablen](#umgebungsvariablen)
+- [Datenbankmigrationen](#datenbankmigrationen)
 - [API-Dokumentation](#api-dokumentation)
   - [API-Endpunkte](#api-endpunkte)
   - [Health Check](#health-check)
 - [Datenbank-Schema](#datenbank-schema)
-  - [Beziehungen und Löschverhalten](#beziehungen-und-loschverhalten)
+  - [Beziehungen und Löschverhalten](#beziehungen-und-löschverhalten)
 - [Architektur](#architektur)
-  - [Ablauf: Authentifizierung](#ablauf-authentifizierung)
-  - [Ablauf: Event und Kategorie](#ablauf-event-und-kategorie)
-  - [Ablauf: Einladungen](#ablauf-einladungen)
+  - [Authentifizierungsablauf](#authentifizierungsablauf)
+  - [Event- und Kategorieablauf](#event--und-kategorieablauf)
+  - [Einladungsablauf](#einladungsablauf)
   - [System-Architektur](#system-architektur)
-- [Sicherheit und Authentifizierung](#sicherheit-und-authentifizierung)
+- [Sicherheit](#sicherheit)
 - [Tests](#tests)
+  - [Unit Tests](#unit-tests)
+  - [Integration Tests](#integration-tests)
+  - [Continuous Integration (GitHub Actions)](#continuous-integration-github-actions)
+
+════════════════════════════════════════════════════════════════════════
 
 ## Über das Projekt
 
@@ -39,9 +44,10 @@ Ein kompatibles Frontend auf Basis von React und TypeScript befindet sich in ein
 
 Frontend und Backend kommunizieren über eine REST-API mit dem Präfix `/api/v1`. Beide Anwendungen können unabhängig voneinander gestartet werden. Für den lokalen gemeinsamen Betrieb müssen die API-Basis-URL des Frontends und `CLIENT_ORIGIN` im Backend zueinander passen.
 
----
+════════════════════════════════════════════════════════════════════════
 
 ## Features
+[Zurück 🡡](#inhaltsverzeichnis)
 
 - **Multi-Tenancy:** Tenant-bezogene Abfragen und zusammengesetzte Fremdschlüssel zur Trennung der Daten unterschiedlicher Unternehmen.
 - **Benutzerverwaltung:** Registrierung als `owner` mit neuem Tenant oder als `member` mit gültigem Einladungscode; Aktualisierung des eigenen Profils.
@@ -55,9 +61,11 @@ Frontend und Backend kommunizieren über eine REST-API mit dem Präfix `/api/v1`
 - **Health Check:** Öffentlicher Readiness-Endpunkt zur Überprüfung der PostgreSQL-Erreichbarkeit, z. B. für Infrastruktur-Monitoring.
 - **CORS:** Origin-Allowlist mit Unterstützung für mehrere konfigurierte Frontend-Adressen und Credentials.
 
----
+════════════════════════════════════════════════════════════════════════
 
 ## Technologie-Stack
+[Zurück 🡡](#inhaltsverzeichnis)
+
 - **Sprache:** Go (Golang)
 - **HTTP-Framework:** [Gin](https://gin-gonic.com/)
 - **Datenbank:** PostgreSQL
@@ -66,11 +74,22 @@ Frontend und Backend kommunizieren über eine REST-API mit dem Präfix `/api/v1`
 - **Umgebungsvariablen:** [godotenv](https://github.com/joho/godotenv) 1.5.1
 - **API-Dokumentation:** Swagger / OpenAPI ([`swaggo/gin-swagger`](https://github.com/swaggo/gin-swagger))
 
----
+
+### Voraussetzungen
+- Go 1.26.4 oder eine kompatible Go-Toolchain, die die im `go.mod` deklarierte Version unterstützt
+- Eine erreichbare PostgreSQL-Datenbank
+- Für den lokalen Frontend-Betrieb optional das EventApp-Frontend
+
+════════════════════════════════════════════════════════════════════════
 
 ## Repository-Struktur
+[Zurück 🡡](#inhaltsverzeichnis)
+
 ```
 .
+├── .github/
+│   └── workflows/
+│       └── ci.yml              # GitHub Actions CI für Backend-Tests und Build
 ├─ cmd
 │  ├── api
 │  │   ├── main.go              # Anwendungseinstieg und PostgreSQL-Verbindung
@@ -91,7 +110,7 @@ Frontend und Backend kommunizieren über eine REST-API mit dem Präfix `/api/v1`
 │  │   │
 │  │   ├── integration_helpers_test.go      # Gemeinsame Testumgebung und Datenbankmigrationen
 │  │   ├── integration_health_test.go       # Integration Test für den Health Check
-│  │   ├──  integration_auth_test.go        # Integration Tests für Registrierung, Login, Token-Erneuerung und Logout
+│  │   ├── integration_auth_test.go        # Integration Tests für Registrierung, Login, Token-Erneuerung und Logout
 │  │   ├── integration_middleware_test.go   # Integration Tests für Auth-Middleware und aktuellen User-/Tenant-Status
 │  │   ├── integration_profile_test.go      # Integration Tests für die Aktualisierung und Validierung des Benutzerprofils
 │  │   ├── integration_attendees_test.go    # Integration Tests für die Teilnehmerverwaltung, Berechtigungen und Tenant-Isolierung
@@ -120,21 +139,16 @@ Frontend und Backend kommunizieren über eine REST-API mit dem Präfix `/api/v1`
 │       └── env.go
 ├── docs              # Generierte Swagger-Dateien 
 ├── .env.example      # Vorlage für lokale Umgebungsvariablen 
-├── go.mod    # Go Module Abhängigkeiten
+├── go.mod            # Go Module Abhängigkeiten
 ├── go.sum
 └── README.md
 ```
----
 
-## Voraussetzungen
-
-- Go 1.26.4 oder eine kompatible Go-Toolchain, die die im `go.mod` deklarierte Version unterstützt
-- Eine erreichbare PostgreSQL-Datenbank
-- Für den lokalen Frontend-Betrieb optional das EventApp-Frontend
-
----
+════════════════════════════════════════════════════════════════════════
 
 ## Umgebungsvariablen
+[Zurück 🡡](#inhaltsverzeichnis)
+
 #### `/EventApp/.env`
 
 ```env
@@ -162,10 +176,10 @@ Bei Verwendung von Neon sind zwei unterschiedliche Verbindungstypen vorgesehen:
 Für beide Variablen werden die jeweils von Neon bereitgestellten Verbindungs-URLs verwendet. Bei einer Pooler-Verbindung enthält der Host üblicherweise den entsprechenden Pooler-Endpunkt; die Migrationsverbindung verwendet den direkten Endpunkt. Zugangsdaten mit reservierten URL-Zeichen müssen URL-kodiert sein.
 Die API liest ausschließlich `DATABASE_URL`. Das separate Migrationstool liest ausschließlich `MIGRATIONS_DATABASE_URL`.
 
-
----
+════════════════════════════════════════════════════════════════════════
 
 ## Datenbankmigrationen
+[Zurück 🡡](#inhaltsverzeichnis)
 
 Die Datenbankmigrationen werden als eigenständiges Kommando ausgeführt. Das Tool verwendet `golang-migrate`, den PostgreSQL-Migrationstreiber und den dateibasierten Source `cmd/migrate/migrations`.
 
@@ -198,9 +212,10 @@ go run ./cmd/migrate down
 
 Die Migrationen definieren unter anderem Identity-Spalten für automatisch generierte IDs, Constraints, zusammengesetzte Fremdschlüssel und Indizes. Die Tabellen werden in der oben angegebenen Reihenfolge angelegt, damit die referenzierten Tabellen bereits vorhanden sind.
 
----
+════════════════════════════════════════════════════════════════════════
 
 ## API-Dokumentation
+[Zurück 🡡](#inhaltsverzeichnis)
 
 Die API verwendet das Präfix `/api/v1`. Swagger wird separat unter `/swagger` bereitgestellt und ist nicht Teil des API-Präfixes.
 
@@ -213,24 +228,7 @@ Geschützte Endpunkte erwarten den Access Token im Header:
 ```http
 Authorization: Bearer <accessToken>
 ```
-
-#### Health Check
-
-Der öffentliche Readiness-Endpunkt dient zur Überwachung der Verfügbarkeit des Backends und seiner PostgreSQL-Datenbank. Er ist für Infrastruktur-Monitoring vorgesehen, beispielsweise für die Health Checks von Render.
-
-| Methode | Endpunkt | Authentifizierung | Beschreibung |
-|---|---|---|---|
-| `GET` | `/health/ready` | Öffentlich (keine Authentifizierung) | Prüft, ob die Datenbankverbindung initialisiert ist und PostgreSQL erreichbar ist. |
-
-Der Endpunkt prüft, ob eine initialisierte Datenbankverbindung vorhanden ist und ob eine Kommunikation mit PostgreSQL erfolgreich möglich ist. Die Datenbankprüfung verwendet ein Timeout von zwei Sekunden, damit der Health Check nicht unbegrenzt auf eine Antwort wartet.
-
-Antworten:
-- `200 OK` – Das Backend ist bereit, Requests zu verarbeiten, und die Datenbankverbindung ist verfügbar.
-- `503 Service Unavailable` – Die Datenbankverbindung ist nicht verfügbar oder die Readiness-Prüfung kann nicht erfolgreich abgeschlossen werden.
-
-Der Endpunkt benötigt keinen Access Token und liegt außerhalb des Präfixes `/api/v1`.
-
-
+### API-Endpunkte
 #### Authentifizierung und Benutzerprofil
 | Methode | Endpunkt | Authentifizierung | Beschreibung |
 |---|---|---|---|
@@ -240,6 +238,9 @@ Der Endpunkt benötigt keinen Access Token und liegt außerhalb des Präfixes `/
 | `POST` | `/api/v1/auth/logout` | Öffentlich | Refresh-Cookie löschen |
 | `PUT` | `/api/v1/users/profile` | Bearer Access Token | Eigenes Profil aktualisieren |
 
+[Zurück 🡡](#inhaltsverzeichnis)
+
+---
 
 #### Registrierungsmodi:
 
@@ -252,6 +253,10 @@ Bei der Member-Registrierung prüft der Server, ob die Einladung existiert, gül
 Tenant-ID, Rolle (`owner` beziehungsweise `member`) und Status werden serverseitig festgelegt. Vom Client übermittelte Werte sind dafür nicht maßgeblich. Passwörter müssen mindestens 8 Zeichen umfassen und dürfen 72 Bytes nicht überschreiten. E-Mail-Adressen sind global eindeutig und werden ohne Berücksichtigung der Groß-/Kleinschreibung behandelt.
 
 Firmennamen werden vor der Speicherung bereinigt. Für die Eindeutigkeitsprüfung werden Leerzeichen normalisiert und Groß-/Kleinschreibung vereinheitlicht; zusätzlich wird ein eindeutiger Slug erzeugt.
+
+[Zurück 🡡](#inhaltsverzeichnis)
+
+---
 
 #### Einladungen
 
@@ -272,6 +277,9 @@ Alle Einladungsendpunkte erfordern einen gültigen Bearer Access Token und die R
 
 Beide erfolgreichen DELETE-Operationen liefern `204 No Content`. Eine nicht vorhandene oder für den Tenant nicht zugängliche Einladung wird nicht offengelegt und führt zu `404 Not Found`. Die Tenant-Zuordnung wird aus dem authentifizierten Benutzerkontext abgeleitet.
 
+[Zurück 🡡](#inhaltsverzeichnis)
+
+---
 
 #### Events(Tenant-geschützt)
 | Methode | Endpunkt | Authentifizierung | Beschreibung |
@@ -294,6 +302,8 @@ Die Request-Validierung umfasst unter anderem:
 - `startDateTime` und `endDateTime`: erforderlich
 - Kategorie: eine gültige `categoryId` oder ein `categoryName`
 
+---
+
 #### Kategorien
 
 | Methode | Endpunkt | Authentifizierung | Beschreibung |
@@ -304,6 +314,10 @@ Die Tabelle `categories` unterstützt benutzerdefinierte Kategorien (`is_default
 
 Beim Erstellen oder Aktualisieren eines Events kann eine Kategorie  über `categoryName` angegeben werden. Bei `categoryName` sucht die Anwendung innerhalb desselben Tenants nach einer vorhandenen Kategorie. Die Normalisierung entfernt führende und nachgestellte Leerzeichen, fasst aufeinanderfolgende Leerzeichen zusammen und ignoriert Groß-/Kleinschreibung. Falls keine passende Kategorie existiert, wird eine benutzerdefinierte Kategorie angelegt. 
 Kategorieauflösung und Event-Änderung erfolgen transaktional. Wenn ein Event geändert oder gelöscht wird, entfernt die Anwendung eine bisherige benutzerdefinierte Kategorie, sofern kein anderes Event sie mehr verwendet. 
+
+[Zurück 🡡](#inhaltsverzeichnis)
+
+---
 
 #### Teilnehmer
 | Methode | Endpunkt | Authentifizierung | Beschreibung |
@@ -317,7 +331,25 @@ Beim Eintragen müssen Event und Zielbenutzer zum authentifizierten Tenant gehö
 
 ---
 
+### Health Check
+
+Der öffentliche Readiness-Endpunkt dient zur Überwachung der Verfügbarkeit des Backends und seiner PostgreSQL-Datenbank. Er ist für Infrastruktur-Monitoring vorgesehen, beispielsweise für die Health Checks von Render.
+
+| Methode | Endpunkt | Authentifizierung | Beschreibung |
+|---|---|---|---|
+| `GET` | `/health/ready` | Öffentlich (keine Authentifizierung) | Prüft, ob die Datenbankverbindung initialisiert ist und PostgreSQL erreichbar ist. |
+
+Der Endpunkt prüft, ob eine initialisierte Datenbankverbindung vorhanden ist und ob eine Kommunikation mit PostgreSQL erfolgreich möglich ist. Die Datenbankprüfung verwendet ein Timeout von zwei Sekunden, damit der Health Check nicht unbegrenzt auf eine Antwort wartet.
+
+Antworten:
+- `200 OK` – Das Backend ist bereit, Requests zu verarbeiten, und die Datenbankverbindung ist verfügbar.
+- `503 Service Unavailable` – Die Datenbankverbindung ist nicht verfügbar oder die Readiness-Prüfung kann nicht erfolgreich abgeschlossen werden.
+
+Der Endpunkt benötigt keinen Access Token und liegt außerhalb des Präfixes `/api/v1`.
+════════════════════════════════════════════════════════════════════════
+
 ## Datenbank-Schema
+[Zurück 🡡](#inhaltsverzeichnis)
 
 #### `tenants`
 | Spalte | Typ | Eigenschaften / Zweck |
@@ -359,6 +391,7 @@ Zusätzlich existiert `UNIQUE (tenant_id, id)` als Ziel für zusammengesetzte Fr
 | `created_by` | `INTEGER` | Erstellender Owner; zusammengesetzter Fremdschlüssel auf `users` |
 | `created_at` | `TEXT` | Erstellungszeitpunkt, Standardwert in UTC |
 
+[Zurück 🡡](#inhaltsverzeichnis)
 
 #### `events`
 | Spalte | Typ | Eigenschaften / Zweck |
@@ -401,6 +434,7 @@ Zusätzlich existiert `UNIQUE (tenant_id, id)` als Ziel für zusammengesetzte Fr
 
 
 ### Beziehungen und Löschverhalten
+[Zurück 🡡](#inhaltsverzeichnis)
 
 | Beziehung | Fremdschlüssel | Löschverhalten |
 |---|---|---|
@@ -416,9 +450,10 @@ Die zusammengesetzten Fremdschlüssel stellen sicher, dass verknüpfte Benutzer,
 
 Die Datenbank-Constraints ergänzen die tenantbezogenen Prüfungen in den Anwendungshandlern; sie ersetzen nicht die Autorisierungsprüfung der API.
 
----
+════════════════════════════════════════════════════════════════════════
 
 ## Architektur
+[Zurück 🡡](#inhaltsverzeichnis)
 
 Das Projekt trennt HTTP-Verarbeitung, Authentifizierung, Datenzugriff und Datenbankmigrationen:
 
@@ -428,6 +463,8 @@ Das Projekt trennt HTTP-Verarbeitung, Authentifizierung, Datenzugriff und Datenb
 - **Datenzugriff (`internal/database`):** Kapselt SQL-Abfragen und Transaktionen für Tenants, Benutzer, Events, Kategorien, Teilnahmen und Einladungen.
 - **PostgreSQL-Verbindung:** `database/sql` wird über `pgx/stdlib` mit PostgreSQL verbunden.
 - **Migrationen (`cmd/migrate`):** Ein separates Kommando verwaltet das Datenbankschema über `golang-migrate` und SQL-Dateien.
+
+---
 
 ### Authentifizierungsablauf
 
@@ -439,9 +476,13 @@ Das Projekt trennt HTTP-Verarbeitung, Authentifizierung, Datenzugriff und Datenb
 6. `POST /api/v1/auth/refresh` prüft das Refresh-Cookie und stellt einen neuen Access Token aus.
 7. `POST /api/v1/auth/logout` löscht das Refresh-Cookie im Browser.
 
+---
+
 ### Event- und Kategorieablauf
 
 Beim Erstellen oder Aktualisieren eines Events werden Event-Änderung und Kategorieauflösung in einer Datenbanktransaktion ausgeführt. Die Kategorie wird anhand einer gültigen `categoryId` verwendet oder anhand von `categoryName` innerhalb des Tenants gefunden beziehungsweise neu angelegt. Beim Aktualisieren oder Löschen eines Events wird geprüft, ob die bisherige benutzerdefinierte Kategorie noch von einem anderen Event verwendet wird. Nicht mehr verwendete benutzerdefinierte Kategorien werden entfernt.
+
+---
 
 ### Einladungsablauf
 
@@ -452,7 +493,10 @@ Beim Erstellen oder Aktualisieren eines Events werden Event-Änderung und Katego
 5. Die API prüft Einladung und Tenant. Das Mitglied wird angelegt und die Einladung innerhalb derselben Transaktion als verwendet markiert.
 6. Owner können Einladungen auflisten, gültige Einladungen widerrufen und Einladungsdatensätze dauerhaft löschen.
 
+---
+
 ### System-Architektur
+[Zurück 🡡](#inhaltsverzeichnis)
 
 ```text
                          
@@ -577,9 +621,10 @@ Zusätzlich ist `GET /health/ready` als öffentlicher Readiness-Endpunkt direkt 
 
 Swagger UI wird unter `/swagger/*any` bereitgestellt.
 
----
+════════════════════════════════════════════════════════════════════════
 
 ## Sicherheit
+[Zurück 🡡](#inhaltsverzeichnis)
 
 - **JWT-Signatur und Gültigkeit:** Access und Refresh Tokens werden mit HS256 signiert. Der Parser prüft den erwarteten Signaturalgorithmus, Issuer, Ablaufzeit und Token-Typ.
 - **Token-Laufzeiten:** Access Token 15 Minuten; Refresh Token 7 Tage.
@@ -592,9 +637,9 @@ Swagger UI wird unter `/swagger/*any` bereitgestellt.
 - **Einladungstoken:** Der Klartext-Code wird nur bei der Erstellung ausgegeben; gespeichert wird ausschließlich sein SHA-256-Hash. Die Registrierung und das Markieren einer Einladung als verwendet erfolgen atomar.
 - **CORS:** Nur konfigurierte `CLIENT_ORIGIN`-Werte werden als Origins zugelassen. Credentials werden für erlaubte Origins unterstützt. 
 
----
-
+════════════════════════════════════════════════════════════════════════
 ## Tests
+[Zurück 🡡](#inhaltsverzeichnis)
 
 Das Backend enthält automatisierte `Unit Tests` und eine separate Infrastruktur für `Integration Tests`. Beide Testarten verwenden die Go-Testbibliothek testing.
 
@@ -603,7 +648,9 @@ Das Backend enthält automatisierte `Unit Tests` und eine separate Infrastruktur
 
 Unit Tests prüfen einzelne Funktionen, Handler und Middleware unabhängig von einer realen PostgreSQL-Datenbank. Für HTTP-bezogene Tests werden net/http/httptest und testbezogene Gin-Kontexte verwendet.
 
-#### Unit Tests ausführen
+---
+
+##### Unit Tests ausführen
 
 Unit Tests des API-Pakets:
 ```
@@ -614,7 +661,9 @@ Unit Tests aller Go-Pakete:
 ```
 go test ./...
 ```
-Unit-Testumfang
+---
+
+#### Unit-Testumfang
 | Testdatei | Abgedeckte Bereiche |
 |---|---|
 | `cmd/api/auth_test.go` | Erzeugung und Prüfung von Access und Refresh Tokens; Ablehnung falscher Token-Typen, ungültiger Signaturen, abgelaufener Tokens und ungültiger User-IDs; Attribute und Löschung des Refresh-Token-Cookies unter HTTP- und HTTPS-Bedingungen |
@@ -623,12 +672,16 @@ Unit-Testumfang
 
 Die Unit Tests verwenden tabellengesteuerte Testfälle (t.Run), um mehrere gültige und ungültige Eingaben mit denselben Prüfungen abzudecken. HTTP-bezogene Tests verwenden Requests und Response Recorder über httptest, ohne einen separaten HTTP-Server zu starten.
 
+---
 
 ### Integration Tests
+[Zurück 🡡](#inhaltsverzeichnis)
 
 Integration Tests prüfen das Zusammenspiel der HTTP-Routen, Handler, Datenbankmodelle und einer echten PostgreSQL-Datenbank.
 Dafür wird ein HTTP-Testserver mit httptest.NewServer gestartet. Die Datenbankverbindung erfolgt über eine separate Neon-Branch-Datenbank. Vor den Tests werden die vorhandenen Datenbankmigrationen automatisch angewendet.
 Integration Tests sind durch den Go-Build-Tag integration von den regulären Unit Tests getrennt.
+
+---
 
 #### Testumgebung und Datenbank
 
@@ -647,6 +700,8 @@ Es gibt keinen Fallback auf `DATABASE_URL` oder `MIGRATIONS_DATABASE_URL`.
 Die Datenbankmigrationen werden vor dem Start der Integration Tests automatisch angewendet. Dafür wird eine separate Datenbankverbindung verwendet, damit die Verbindung der Anwendung unabhängig bleibt.
 
 Wichtig: Für Integration Tests muss eine dedizierte Testdatenbank verwendet werden. Die produktive Datenbank darf nicht als Testdatenbank konfiguriert werden.
+
+---
 
 #### Integration Tests ausführen
 
@@ -678,6 +733,9 @@ Event-Verwaltung:
 ```
 go test -tags=integration ./cmd/api -run "TestIntegration(CreateEvent|GetAllEvents|GetEvent|UpdateEvent|DeleteEvent)" -v
 ```
+[Zurück 🡡](#inhaltsverzeichnis)
+
+---
 
 #### Abdeckung der Integration Tests
 
@@ -690,16 +748,29 @@ go test -tags=integration ./cmd/api -run "TestIntegration(CreateEvent|GetAllEven
 | `cmd/api/integration_attendees_test.go` | Prüfung der Teilnehmerverwaltung über die HTTP-API: Hinzufügen und Entfernen von Teilnehmern; Berechtigungen des Event-Erstellers und des jeweiligen Teilnehmers; Ablehnung doppelter Teilnahmen und inaktiver Benutzer; Tenant-Isolierung für Events und Benutzer; Abruf und Sortierung der Teilnehmer- und Eventlisten; Behandlung leerer Ergebnisse und wiederholter Löschversuche; Überprüfung der Datenbankzustände nach Änderungen. |
 | `cmd/api/integration_events_test.go` | Integration Tests für die Event-Verwaltung über die HTTP-API: Erstellung von Events einschließlich Prüfung der serverseitigen Owner- und Tenant-Zuordnung; Abruf der Event-Liste mit Tenant-Isolierung und `ownerId`-Filter; Abruf einzelner Events; Aktualisierung und Löschung durch den jeweiligen Event-Ersteller; Ablehnung unberechtigter Änderungen und Löschungen innerhalb desselben Tenants (`403 Forbidden`); Ablehnung von Zugriffen auf Events anderer Tenants (`404 Not Found`); Überprüfung der gespeicherten Daten und der Datenbankzustände nach erfolgreichen und abgewiesenen Änderungen. |
 
+[Zurück 🡡](#inhaltsverzeichnis)
+
+---
 
 Die `Authentifizierungs-Integrationstests` senden HTTP-Requests an den gestarteten Testserver und prüfen zusätzlich relevante Datenbankzustände direkt in PostgreSQL. Dazu gehören unter anderem die Tenant- und Benutzerzuordnung, der gespeicherte bcrypt-Passworthash sowie der Verwendungsstatus einer Einladung.
 
+---
+
 Die `Integration Tests der Auth-Middleware` prüfen die Aktualität des Benutzer- und Tenant-Status direkt anhand der PostgreSQL-Datenbank. Dazu werden Benutzer und Tenants nach der Ausstellung eines Access Tokens verändert. Die Tests stellen sicher, dass deaktivierte Benutzer, gesperrte Tenants und gelöschte Benutzer keinen Zugriff auf geschützte Endpunkte erhalten. Zusätzlich wird geprüft, dass die Middleware aktuelle Benutzerdaten aus der Datenbank in den Gin-Kontext übernimmt.
 
+---
+
 Die `Integration Tests des Benutzerprofils` verwenden den geschützten API-Endpunkt `PUT /api/v1/users/profile`. Neben der erfolgreichen Aktualisierung und der anschließenden Überprüfung der gespeicherten Daten werden auch ungültige Eingaben und fehlende Authentifizierung geprüft. Außerdem wird sichergestellt, dass vom Client übermittelte Änderungen an geschützten Benutzerfeldern wie Tenant-ID, Rolle und Status keine Auswirkungen auf die gespeicherten Kontodaten haben.
+
+---
 
 Die `Integrationstests der Einladungsverwaltung` prüfen die Owner-only-Berechtigungen und die Tenant-Isolierung anhand der tatsächlichen HTTP-Endpunkte. Dazu werden Einladungen über die API erstellt, aufgelistet, widerrufen und dauerhaft gelöscht. Die Tests überprüfen sowohl die zurückgegebenen HTTP-Statuscodes als auch die zugehörigen Datensätze direkt in PostgreSQL.
 Es wird geprüft, dass in der Datenbank ausschließlich der SHA-256-Hash und nicht der ursprüngliche Einladungscode gespeichert wird. Zusätzlich werden ungültige Ablaufzeitpunkte, fehlende Authentifizierung, unzureichende Benutzerrechte und Zugriffsversuche auf Einladungen anderer Tenants getestet.
 Nach Änderungen am Einladungsstatus wird der tatsächliche Datenbankzustand überprüft. Dadurch wird sichergestellt, dass abgewiesene Requests keine unerwünschten Änderungen oder Löschungen verursachen.
+
+[Zurück 🡡](#inhaltsverzeichnis)
+
+---
 
 Die `Integrationstests der Teilnehmerverwaltung` prüfen die vier geschützten HTTP-Endpunkte für die Verwaltung von Event-Teilnehmern. Die Requests werden an den gestarteten HTTP-Testserver gesendet und mit einer echten PostgreSQL-Datenbank ausgeführt.
 
@@ -715,7 +786,9 @@ Die Tests zum Entfernen von Teilnehmern prüfen die Berechtigung des Event-Erste
 
 Nach erfolgreichen und abgewiesenen Änderungen wird der tatsächliche Datenbankzustand kontrolliert. Dadurch wird sichergestellt, dass berechtigte Requests die Teilnahme korrekt ändern und abgewiesene Requests keine unerwünschten Datenbankänderungen verursachen.
 
+[Zurück 🡡](#inhaltsverzeichnis)
 
+---
 
 Die `Integrationstests der Eventverwaltung` prüfen die fünf geschützten HTTP-Endpunkte für die Erstellung, Auflistung, den Abruf, die Aktualisierung und die Löschung von Events. Die Tests verwenden echte Access Tokens und führen die Requests über den gestarteten HTTP-Testserver gegen eine PostgreSQL-Datenbank aus.
 
@@ -726,3 +799,24 @@ Bei der Event-Erstellung wird geprüft, dass die Owner-ID unabhängig von einem 
 Die Aktualisierung und Löschung eines Events sind ausschließlich dem jeweiligen Ersteller vorbehalten. Die Tests prüfen erfolgreiche Änderungen durch den Event-Ersteller sowie die Ablehnung unberechtigter Änderungs- und Löschversuche durch andere Benutzer desselben Tenants mit `403 Forbidden`. Zugriffe auf Events anderer Tenants werden mit `404 Not Found` abgelehnt.
 
 Nach erfolgreichen und abgewiesenen Änderungen wird der tatsächliche Datenbankzustand kontrolliert. Dadurch wird sichergestellt, dass die Owner- und Tenant-Zuordnung korrekt bleibt, berechtigte Änderungen gespeichert werden und unberechtigte Requests keine unerwünschten Änderungen oder Löschungen verursachen.
+
+---
+
+### Continuous Integration (GitHub Actions)
+[Zurück 🡡](#inhaltsverzeichnis)
+
+Für die automatisierte Qualitätssicherung wird GitHub Actions
+eingesetzt.
+
+Der Workflow wird bei jedem Push auf den Branch `main`,
+bei Pull Requests gegen `main` sowie manuell gestartet.
+
+Der CI-Prozess umfasst folgende Schritte:
+- Installation der Go-Abhängigkeiten
+- Ausführung der Unit Tests
+- Ausführung der PostgreSQL-Integrationstests
+  mit einer temporären PostgreSQL-18-Datenbank
+- Kompilierung des Backend-Projekts (`go build ./...`)
+
+Dadurch werden Tests und Build nach Änderungen am Backend
+automatisch überprüft.
